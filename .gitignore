@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Ocultar Credenciales ###
+src/main/resources/application.properties
