@@ -1,9 +1,9 @@
-package com.miguel.apilumina.controller;
+package com.miguel.api_lumina.controller;
 
-import com.miguel.apilumina.dto.PacienteRequestDTO;
-import com.miguel.apilumina.dto.PacienteResponseDTO;
-import com.miguel.apilumina.entity.PacienteEntity;
-import com.miguel.apilumina.service.PacienteService;
+import com.miguel.api_lumina.dto.PacienteRequestDTO;
+import com.miguel.api_lumina.dto.PacienteResponseDTO;
+import com.miguel.api_lumina.entity.PacienteEntity;
+import com.miguel.api_lumina.service.PacienteService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,7 +1,7 @@
-package com.miguel.apilumina.service;
+package com.miguel.api_lumina.service;
 
-import com.miguel.apilumina.entity.PacienteEntity;
-import com.miguel.apilumina.repository.PacienteRepository;
+import com.miguel.api_lumina.entity.PacienteEntity;
+import com.miguel.api_lumina.repository.PacienteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

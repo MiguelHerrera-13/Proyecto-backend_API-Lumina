@@ -1,4 +1,4 @@
-package com.miguel.apilumina.entity;
+package com.miguel.api_lumina.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

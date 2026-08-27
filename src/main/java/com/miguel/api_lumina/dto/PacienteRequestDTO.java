@@ -1,4 +1,4 @@
-package com.miguel.apilumina.dto;
+package com.miguel.api_lumina.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
