@@ -6,7 +6,6 @@ import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import com.miguel.api_lumina.exception.EmailYaRegistradoException;
 import com.miguel.api_lumina.service.UsuarioService;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
