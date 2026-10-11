@@ -6,6 +6,7 @@ public class TurnoRequestDTO {
     
     private Long idPaciente;
     private Long idCuidador;
+    private Long idMedico;
     private LocalDateTime fechaHoraInicio;
     private LocalDateTime fechaHoraFin;
     private String estado;
@@ -23,6 +24,14 @@ public class TurnoRequestDTO {
 
     public Long getIdCuidador() {
         return idCuidador;
+    }
+
+    public Long getIdMedico() {
+        return idMedico;
+    }
+
+    public void setIdMedico(Long idMedico) {
+        this.idMedico = idMedico;
     }
 
     public void setIdCuidador(Long idCuidador) {

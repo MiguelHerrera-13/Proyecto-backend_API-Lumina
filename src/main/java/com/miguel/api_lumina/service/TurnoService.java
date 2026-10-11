@@ -43,9 +43,21 @@ public class TurnoService {
         UsuarioEntity cuidador = usuarioRepository.findById(dto.getIdCuidador())
                 .orElseThrow(() -> new IllegalArgumentException("El cuidador no existe"));
 
+        if (dto.getIdMedico() == null) {
+            throw new IllegalArgumentException("El médico es obligatorio");
+        }
+
+        UsuarioEntity medico = usuarioRepository.findById(dto.getIdMedico())
+                .orElseThrow(() -> new IllegalArgumentException("El médico no existe"));
+
+        if (medico.getRol() != null && !medico.getRol().equalsIgnoreCase("MEDICO")) {
+            throw new IllegalArgumentException("El usuario indicado no tiene rol de MEDICO");
+        }
+
         TurnoEntity turno = new TurnoEntity();
         turno.setPaciente(paciente);
         turno.setCuidador(cuidador);
+        turno.setMedico(medico);
         turno.setFechaHoraInicio(dto.getFechaHoraInicio());
         turno.setFechaHoraFin(dto.getFechaHoraFin());
         turno.setEstado(dto.getEstado());
@@ -73,12 +85,20 @@ public class TurnoService {
 
     private TurnoResponseDTO mapToDTO(TurnoEntity turno) {
         TurnoResponseDTO dto = new TurnoResponseDTO();
+
         dto.setIdTurno(turno.getIdTurno());
         dto.setNombrePaciente(turno.getPaciente().getNombreCompleto());
         dto.setNombreCuidador(turno.getCuidador().getNombre());
+
+        if (turno.getMedico() != null) {
+            dto.setIdMedico(turno.getMedico().getIdUsuario());
+            dto.setNombreMedico(turno.getMedico().getNombre());
+        }
+
         dto.setFechaHoraInicio(turno.getFechaHoraInicio());
         dto.setFechaHoraFin(turno.getFechaHoraFin());
         dto.setEstado(turno.getEstado());
+
         return dto;
     }
 }

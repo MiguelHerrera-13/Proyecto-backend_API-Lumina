@@ -7,6 +7,8 @@ public class TurnoResponseDTO {
     private Long idTurno;
     private String nombrePaciente;
     private String nombreCuidador;
+    private Long idMedico;
+    private String nombreMedico;
     private LocalDateTime fechaHoraInicio;
     private LocalDateTime fechaHoraFin;
     private String estado;
@@ -36,6 +38,22 @@ public class TurnoResponseDTO {
 
     public void setNombreCuidador(String nombreCuidador) {
         this.nombreCuidador = nombreCuidador;
+    }
+
+    public Long getIdMedico() {
+        return idMedico;
+    }
+
+    public void setIdMedico(Long idMedico) {
+        this.idMedico = idMedico;
+    }
+
+    public String getNombreMedico() {
+        return nombreMedico;
+    }
+
+    public void setNombreMedico(String nombreMedico) {
+        this.nombreMedico = nombreMedico;
     }
 
     public LocalDateTime getFechaHoraInicio() {
