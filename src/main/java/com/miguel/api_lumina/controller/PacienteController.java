@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.miguel.api_lumina.dto.HistorialDTO;
 
 import java.util.Optional;
 
@@ -20,7 +21,13 @@ public class PacienteController {
     public PacienteController(PacienteService pacienteService) {
         this.pacienteService = pacienteService;
     }
+    @GetMapping("/{id}/historial")
+    public ResponseEntity<HistorialDTO> obtenerHistorial(@PathVariable Long id) {
 
+        HistorialDTO historial = pacienteService.obtenerHistorial(id);
+
+        return ResponseEntity.ok(historial);
+    }
     @PostMapping
     public ResponseEntity<PacienteResponseDTO> crearPaciente(@Valid @RequestBody PacienteRequestDTO requestDTO) {
         // Mapeo manual RequestDTO -> Entity
