@@ -33,6 +33,10 @@ public class TurnoEntity {
     @JoinColumn(name = "id_cuidador")
     private UsuarioEntity cuidador;
 
+    @ManyToOne
+    @JoinColumn(name = "id_medico")
+    private UsuarioEntity medico;
+
     @Column(name = "fecha_hora_inicio")
     private LocalDateTime fechaHoraInicio;
 
@@ -76,6 +80,14 @@ public class TurnoEntity {
         this.cuidador = cuidador;
     }
 
+    public UsuarioEntity getMedico() {
+        return medico;
+    }
+
+    public void setMedico(UsuarioEntity medico) {
+        this.medico = medico;
+    }
+
     public LocalDateTime getFechaHoraInicio() {
         return fechaHoraInicio;
     }
@@ -115,4 +127,5 @@ public class TurnoEntity {
     public void setActivo(Boolean activo) {
         this.activo = activo;
     }
+
 }

@@ -46,6 +46,7 @@ class TurnoServiceTest {
         TurnoRequestDTO request = new TurnoRequestDTO();
         request.setIdPaciente(1L);
         request.setIdCuidador(2L);
+        request.setIdMedico(3L);
         request.setFechaHoraInicio(LocalDateTime.of(2026, 1, 1, 10, 0));
         request.setFechaHoraFin(LocalDateTime.of(2026, 1, 1, 11, 0));
         request.setEstado("PENDIENTE");
@@ -58,16 +59,23 @@ class TurnoServiceTest {
         cuidador.setIdUsuario(2L);
         cuidador.setNombre("Cuidador Test");
 
+        UsuarioEntity medico = new UsuarioEntity();
+        medico.setIdUsuario(3L);
+        medico.setNombre("Medico Test");
+        medico.setRol("MEDICO");
+
         TurnoEntity turnoGuardado = new TurnoEntity();
         turnoGuardado.setIdTurno(1L);
         turnoGuardado.setPaciente(paciente);
         turnoGuardado.setCuidador(cuidador);
+        turnoGuardado.setMedico(medico);
         turnoGuardado.setFechaHoraInicio(request.getFechaHoraInicio());
         turnoGuardado.setFechaHoraFin(request.getFechaHoraFin());
         turnoGuardado.setEstado("PENDIENTE");
 
         when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
         when(usuarioRepository.findById(2L)).thenReturn(Optional.of(cuidador));
+        when(usuarioRepository.findById(3L)).thenReturn(Optional.of(medico));
         when(turnoRepository.save(any(TurnoEntity.class))).thenReturn(turnoGuardado);
 
         // Act
@@ -78,6 +86,8 @@ class TurnoServiceTest {
         assertEquals(1L, response.getIdTurno());
         assertEquals("Paciente Test", response.getNombrePaciente());
         assertEquals("Cuidador Test", response.getNombreCuidador());
+        assertEquals(3L, response.getIdMedico());
+        assertEquals("Medico Test", response.getNombreMedico());
         verify(turnoRepository, times(1)).save(any(TurnoEntity.class));
     }
 

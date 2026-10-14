@@ -18,17 +18,26 @@ public class ReporteDiarioService {
 
     private final ReporteDiarioRepository reporteDiarioRepository;
     private final TurnoRepository turnoRepository;
+    private final AlertaService alertaService;
 
-    public ReporteDiarioService(ReporteDiarioRepository reporteDiarioRepository, TurnoRepository turnoRepository) {
+    public ReporteDiarioService(
+            ReporteDiarioRepository reporteDiarioRepository,
+            TurnoRepository turnoRepository,
+            AlertaService alertaService) {
+
         this.reporteDiarioRepository = reporteDiarioRepository;
         this.turnoRepository = turnoRepository;
+        this.alertaService = alertaService;
     }
 
     @Transactional
     public ReporteDiarioEntity registrarReporte(ReporteDiarioRequestDTO requestDTO) {
-        // Validar que el turno exista (Punto 9)
+
         TurnoEntity turno = turnoRepository.findById(requestDTO.getIdTurno())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El turno con ID " + requestDTO.getIdTurno() + " no existe"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "El turno con ID " + requestDTO.getIdTurno() + " no existe"
+                ));
 
         ReporteDiarioEntity entity = new ReporteDiarioEntity();
         entity.setTurno(turno);
@@ -36,7 +45,70 @@ public class ReporteDiarioService {
         entity.setPresionArterial(requestDTO.getPresionArterial());
         entity.setObservacion(requestDTO.getObservacion());
 
-        return reporteDiarioRepository.save(entity);
+        ReporteDiarioEntity reporteGuardado = reporteDiarioRepository.save(entity);
+
+        if (esReporteCritico(reporteGuardado)) {
+
+            if (turno.getMedico() == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El turno no tiene un médico asignado"
+                );
+            }
+
+            String mensaje = generarMensajeAlerta(reporteGuardado);
+
+            alertaService.crearAlerta(
+                    reporteGuardado,
+                    turno.getMedico(),
+                    mensaje
+            );
+        }
+
+        return reporteGuardado;
+    }
+
+    private boolean esReporteCritico(ReporteDiarioEntity reporte) {
+
+        if (reporte.getTemperatura() != null) {
+            if (reporte.getTemperatura() >= 38.0
+                    || reporte.getTemperatura() <= 35.0) {
+                return true;
+            }
+        }
+
+        if (reporte.getPresionArterial() != null) {
+
+            try {
+                String[] partes = reporte.getPresionArterial().split("/");
+
+                if (partes.length == 2) {
+                    int sistolica = Integer.parseInt(partes[0].trim());
+                    int diastolica = Integer.parseInt(partes[1].trim());
+
+                    return sistolica >= 180 || diastolica >= 120;
+                }
+
+            } catch (NumberFormatException ignored) {
+                // Si el formato no es válido, no lo consideramos crítico acá.
+            }
+        }
+
+        return false;
+    }
+
+    private String generarMensajeAlerta(ReporteDiarioEntity reporte) {
+
+        if (reporte.getTemperatura() != null
+                && (reporte.getTemperatura() >= 38.0
+                || reporte.getTemperatura() <= 35.0)) {
+
+            return "Temperatura crítica detectada: "
+                    + reporte.getTemperatura() + " °C";
+        }
+
+        return "Presión arterial crítica detectada: "
+                + reporte.getPresionArterial();
     }
 
     public List<ReporteDiarioEntity> obtenerReportesPorTurno(Long idTurno) {

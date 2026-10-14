@@ -5,6 +5,7 @@ import com.miguel.api_lumina.entity.ReporteDiarioEntity;
 import com.miguel.api_lumina.entity.TurnoEntity;
 import com.miguel.api_lumina.repository.ReporteDiarioRepository;
 import com.miguel.api_lumina.repository.TurnoRepository;
+import com.miguel.api_lumina.entity.UsuarioEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class ReporteDiarioServiceTest {
 
     @Mock
     private TurnoRepository turnoRepository;
+
+    @Mock
+    private AlertaService alertaService;
 
     @InjectMocks
     private ReporteDiarioService reporteDiarioService;
@@ -70,6 +74,11 @@ class ReporteDiarioServiceTest {
         assertEquals("Paciente estable y descansando.", resultado.getObservacion());
         assertEquals(1L, resultado.getTurno().getIdTurno());
         verify(reporteDiarioRepository, times(1)).save(any(ReporteDiarioEntity.class));
+        verify(alertaService, never()).crearAlerta(
+                any(),
+                any(),
+                anyString()
+        );
     }
 
     @Test
@@ -120,5 +129,44 @@ class ReporteDiarioServiceTest {
 
         assertTrue(ex.getMessage().contains("El turno con ID 99 no existe"));
         verify(reporteDiarioRepository, never()).findByTurno_IdTurno(anyLong());
+    }
+    @Test
+    @DisplayName("Debe crear una alerta cuando el reporte contiene valores críticos")
+    void registrarReporte_critico_creaAlerta() {
+
+        UsuarioEntity medico = new UsuarioEntity();
+        medico.setIdUsuario(3L);
+        medico.setNombre("Medico Test");
+        medico.setRol("MEDICO");
+
+        turno.setMedico(medico);
+
+        ReporteDiarioRequestDTO requestCritico = new ReporteDiarioRequestDTO();
+        requestCritico.setIdTurno(1L);
+        requestCritico.setTemperatura(36.6);
+        requestCritico.setPresionArterial("190/120");
+        requestCritico.setObservacion("Paciente con presión elevada.");
+
+        when(turnoRepository.findById(1L))
+                .thenReturn(Optional.of(turno));
+
+        when(reporteDiarioRepository.save(any(ReporteDiarioEntity.class)))
+                .thenAnswer(invocation -> {
+                    ReporteDiarioEntity reporte = invocation.getArgument(0);
+                    reporte.setIdReporte(11L);
+                    return reporte;
+                });
+
+        ReporteDiarioEntity resultado =
+                reporteDiarioService.registrarReporte(requestCritico);
+
+        assertNotNull(resultado);
+        assertEquals(11L, resultado.getIdReporte());
+
+        verify(alertaService, times(1)).crearAlerta(
+                eq(resultado),
+                eq(medico),
+                contains("Presión arterial crítica")
+        );
     }
 }
