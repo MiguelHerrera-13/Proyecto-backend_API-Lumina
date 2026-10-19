@@ -11,4 +11,6 @@ public interface AlertaRepository extends JpaRepository<AlertaEntity, Long> {
 
     List<AlertaEntity> findByMedico_IdUsuarioAndLeidaFalse(Long idMedico);
 
+    List<AlertaEntity> findByMedico_IdUsuarioAndLeida(Long idMedico, Boolean leida);
+
 }
