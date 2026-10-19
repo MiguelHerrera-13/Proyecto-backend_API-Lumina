@@ -5,6 +5,7 @@ import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.exception.EmailYaRegistradoException;
 import com.miguel.api_lumina.repository.UsuarioRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +15,11 @@ import java.util.Optional;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UsuarioService(UsuarioRepository usuarioRepository) {
+    public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
@@ -28,8 +31,7 @@ public class UsuarioService {
         UsuarioEntity entity = new UsuarioEntity();
         entity.setNombre(request.getNombre());
         entity.setEmail(request.getEmail());
-        // TODO: Hashear contraseña usando PasswordEncoder antes de producción
-        entity.setPasswordHash(request.getPassword());
+        entity.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         entity.setRol(request.getRol());
         entity.setActivo(true);
 
