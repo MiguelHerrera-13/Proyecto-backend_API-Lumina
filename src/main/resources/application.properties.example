@@ -1,0 +1,19 @@
+spring.application.name=api-lumina
+
+# Configuración de conexión a MySQL
+spring.datasource.url=jdbc:mysql://localhost:3306/bd_lumina?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=root
+spring.datasource.password=12345
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# Configuración de Hibernate / JPA
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# Configuración JWT (Seguridad)
+# En producción, definir la variable de entorno JWT_SECRET con una clave de al menos 256 bits.
+jwt.secret=${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+# Tiempo de expiración del token en milisegundos (24 horas = 86400000 ms)
+jwt.expiration=86400000
+
