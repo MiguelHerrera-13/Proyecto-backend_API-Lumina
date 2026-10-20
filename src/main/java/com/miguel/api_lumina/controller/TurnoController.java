@@ -15,7 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/turnos")
-@Tag(name = "Turnos", description = "Gestión de turnos de atención asignados a cuidadores y pacientes")
+@Tag(name = "Turnos", description = "Gestión de turnos de atención asignados a cuidadores y pacientes. Requiere token JWT.")
 public class TurnoController {
 
     private final TurnoService turnoService;
@@ -28,7 +28,8 @@ public class TurnoController {
             description = "Registra un nuevo turno asignando un cuidador a un paciente en un horario determinado.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Turno creado correctamente"),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos: cuidador o paciente inexistente, o superposición de horarios")
+            @ApiResponse(responseCode = "400", description = "Datos inválidos: cuidador o paciente inexistente, o superposición de horarios"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido")
     })
     @PostMapping
     public ResponseEntity<?> crearTurno(@RequestBody TurnoRequestDTO dto) {
@@ -44,6 +45,7 @@ public class TurnoController {
             description = "Busca y devuelve un turno activo por su identificador.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Turno encontrado"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "Turno no encontrado")
     })
     @GetMapping("/{id}")
@@ -59,7 +61,8 @@ public class TurnoController {
     @Operation(summary = "Obtener turnos de un cuidador",
             description = "Lista todos los turnos activos asignados al cuidador con el ID indicado.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de turnos obtenida correctamente")
+            @ApiResponse(responseCode = "200", description = "Lista de turnos obtenida correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido")
     })
     @GetMapping("/cuidador/{idCuidador}")
     public ResponseEntity<List<TurnoResponseDTO>> obtenerTurnosPorCuidador(@PathVariable Long idCuidador) {

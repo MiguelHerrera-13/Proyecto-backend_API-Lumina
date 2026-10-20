@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/alertas")
-@Tag(name = "Alertas", description = "Consulta de alertas clínicas automáticas generadas por el sistema para los médicos")
+@Tag(name = "Alertas", description = "Consulta de alertas clínicas automáticas generadas por el sistema para los médicos. Requiere token JWT.")
 public class AlertaController {
 
     private final AlertaService alertaService;
@@ -25,7 +25,8 @@ public class AlertaController {
     @Operation(summary = "Obtener alertas no leídas de un médico",
             description = "Devuelve la lista de alertas clínicas activas y no leídas asignadas al médico con el ID indicado.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de alertas obtenida correctamente")
+            @ApiResponse(responseCode = "200", description = "Lista de alertas obtenida correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido")
     })
     @GetMapping("/medico/{id}")
     public ResponseEntity<List<AlertaResponseDTO>> obtenerAlertasPorMedico(

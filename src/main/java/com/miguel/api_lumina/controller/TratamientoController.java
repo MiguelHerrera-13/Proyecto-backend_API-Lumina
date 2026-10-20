@@ -16,7 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/tratamientos")
-@Tag(name = "Tratamientos", description = "Gestión de tratamientos y prescripciones médicas asociadas a los pacientes")
+@Tag(name = "Tratamientos", description = "Gestión de tratamientos y prescripciones médicas asociadas a los pacientes. Requiere token JWT.")
 public class TratamientoController {
 
     private final TratamientoService tratamientoService;
@@ -29,7 +29,8 @@ public class TratamientoController {
             description = "Crea un nuevo tratamiento o prescripción médica vinculado a un paciente existente.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Tratamiento creado correctamente"),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos o paciente inexistente")
+            @ApiResponse(responseCode = "400", description = "Datos inválidos o paciente inexistente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido")
     })
     @PostMapping
     public ResponseEntity<TratamientoResponseDTO> registrarTratamiento(@Valid @RequestBody TratamientoRequestDTO requestDTO) {
@@ -40,7 +41,8 @@ public class TratamientoController {
     @Operation(summary = "Obtener tratamientos de un paciente",
             description = "Lista todos los tratamientos activos del paciente con el ID indicado.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de tratamientos obtenida correctamente")
+            @ApiResponse(responseCode = "200", description = "Lista de tratamientos obtenida correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido")
     })
     @GetMapping("/paciente/{id}")
     public ResponseEntity<List<TratamientoResponseDTO>> obtenerTratamientosPorPaciente(@PathVariable("id") Long id) {
@@ -52,6 +54,7 @@ public class TratamientoController {
             description = "Busca y devuelve un tratamiento activo por su identificador.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Tratamiento encontrado"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "Tratamiento no encontrado")
     })
     @GetMapping("/{id}")
@@ -65,6 +68,7 @@ public class TratamientoController {
             description = "Realiza un borrado lógico del tratamiento. El registro permanece en la base de datos con activo=false.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Tratamiento dado de baja correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "Tratamiento no encontrado")
     })
     @DeleteMapping("/{id}")

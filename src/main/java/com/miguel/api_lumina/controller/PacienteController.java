@@ -18,7 +18,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/pacientes")
-@Tag(name = "Pacientes", description = "Gestión de pacientes registrados en el sistema Lumina")
+@Tag(name = "Pacientes", description = "Gestión de pacientes registrados en el sistema Lumina. Requiere token JWT.")
 public class PacienteController {
 
     private final PacienteService pacienteService;
@@ -31,6 +31,7 @@ public class PacienteController {
             description = "Devuelve los turnos y reportes diarios asociados al paciente indicado.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Historial obtenido correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "Paciente no encontrado")
     })
     @GetMapping("/{id}/historial")
@@ -43,7 +44,8 @@ public class PacienteController {
             description = "Crea un paciente con los datos clínicos básicos. Devuelve el paciente creado con su ID generado.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Paciente creado correctamente"),
-            @ApiResponse(responseCode = "400", description = "Datos de entrada inválidos")
+            @ApiResponse(responseCode = "400", description = "Datos de entrada inválidos"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido")
     })
     @PostMapping
     public ResponseEntity<PacienteResponseDTO> crearPaciente(@Valid @RequestBody PacienteRequestDTO requestDTO) {
@@ -71,6 +73,7 @@ public class PacienteController {
             description = "Busca un paciente activo por su ID. Retorna 404 si no existe o fue dado de baja.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paciente encontrado"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "Paciente no encontrado")
     })
     @GetMapping("/{id}")
@@ -97,6 +100,7 @@ public class PacienteController {
             description = "Realiza un borrado lógico del paciente. El registro permanece en la base de datos con activo=false.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Paciente dado de baja correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "Paciente no encontrado")
     })
     @DeleteMapping("/{id}")

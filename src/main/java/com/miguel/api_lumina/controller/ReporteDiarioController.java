@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/reportes-diarios")
-@Tag(name = "Reportes Diarios", description = "Registro de reportes clínicos diarios vinculados a los turnos de atención")
+@Tag(name = "Reportes Diarios", description = "Registro de reportes clínicos diarios vinculados a los turnos de atención. Requiere token JWT.")
 public class ReporteDiarioController {
 
     private final ReporteDiarioService reporteDiarioService;
@@ -33,6 +33,7 @@ public class ReporteDiarioController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Reporte creado correctamente"),
             @ApiResponse(responseCode = "400", description = "Datos inválidos: temperatura fuera de rango, formato de presión incorrecto o campos nulos"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "El turno indicado no existe en el sistema")
     })
     @PostMapping
@@ -44,7 +45,8 @@ public class ReporteDiarioController {
     @Operation(summary = "Obtener reportes de un turno",
             description = "Lista todos los reportes diarios registrados para el turno con el ID indicado.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de reportes obtenida correctamente")
+            @ApiResponse(responseCode = "200", description = "Lista de reportes obtenida correctamente"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido")
     })
     @GetMapping("/turno/{idTurno}")
     public ResponseEntity<List<ReporteDiarioResponseDTO>> obtenerReportesPorTurno(@PathVariable Long idTurno) {
@@ -59,6 +61,7 @@ public class ReporteDiarioController {
             description = "Busca y devuelve un reporte diario activo por su identificador.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reporte encontrado"),
+            @ApiResponse(responseCode = "401", description = "No autenticado: se requiere token JWT válido"),
             @ApiResponse(responseCode = "404", description = "Reporte no encontrado")
     })
     @GetMapping("/{id}")
