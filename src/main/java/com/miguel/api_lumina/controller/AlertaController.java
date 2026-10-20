@@ -19,11 +19,21 @@ public class AlertaController {
 
     @GetMapping("/medico/{id}")
     public ResponseEntity<List<AlertaResponseDTO>> obtenerAlertasPorMedico(
-            @PathVariable("id") Long idMedico) {
+            @PathVariable("id") Long idMedico,
+            @RequestParam(value = "leida", required = false) Boolean leida) {
 
         List<AlertaResponseDTO> alertas =
-                alertaService.obtenerAlertasNoLeidasPorMedico(idMedico);
+                alertaService.obtenerAlertasPorMedicoYEstado(idMedico, leida);
 
         return ResponseEntity.ok(alertas);
+    }
+
+    @PatchMapping("/medico/{idMedico}/{idAlerta}/leida")
+    public ResponseEntity<AlertaResponseDTO> marcarAlertaComoLeida(
+            @PathVariable("idMedico") Long idMedico,
+            @PathVariable("idAlerta") Long idAlerta) {
+
+        AlertaResponseDTO response = alertaService.marcarAlertaComoLeida(idMedico, idAlerta);
+        return ResponseEntity.ok(response);
     }
 }
