@@ -23,7 +23,10 @@ La forma técnica de comprobar esa relación queda fuera del alcance de esta iss
 ### Alertas
 
 - `GET /api/alertas/medico/{id}`  
-  Consulta las alertas clínicas no leídas asociadas a un médico.
+  Consulta las alertas asociadas a un médico. Permite filtrar por estado de lectura mediante el parámetro opcional `leida=true|false`. Si se omite, conserva el comportamiento de consultar alertas no leídas.
+
+- `PATCH /api/alertas/medico/{idMedico}/{idAlerta}/leida`  
+  Marca como leída una alerta perteneciente al médico indicado.
 
 ### Pacientes
 
@@ -86,7 +89,32 @@ La forma técnica de comprobar esa relación queda fuera del alcance de esta iss
 - `DELETE /api/usuarios/{id}`  
   Realiza la baja lógica de un usuario.
 
+### Autenticación
+
+- `POST /api/auth/login`  
+  Valida correo y contraseña y, cuando las credenciales son correctas, devuelve un token JWT con la identidad y rol del usuario.
+
+  Este endpoint es público porque se utiliza antes de que el usuario esté autenticado.
+
 ---
+
+### Medicamentos
+
+- `POST /api/medicamentos`  
+  Crea un medicamento asociado a un tratamiento.
+
+- `GET /api/medicamentos/{id}`  
+  Consulta un medicamento por su identificador.
+
+- `GET /api/medicamentos/tratamiento/{idTratamiento}`  
+  Consulta los medicamentos asociados a un tratamiento.
+
+- `PUT /api/medicamentos/{id}`  
+  Actualiza los datos de un medicamento.
+
+- `DELETE /api/medicamentos/{id}`  
+  Realiza la baja lógica de un medicamento.
+
 
 ## Matriz propuesta de permisos
 
@@ -110,6 +138,12 @@ La forma técnica de comprobar esa relación queda fuera del alcance de esta iss
 | `POST /api/usuarios` | ⚠️ | ⚠️ | ⚠️ | Debe definirse si existe autorregistro o si las cuentas son creadas por administración |
 | `GET /api/usuarios/{id}` | ✅ | ✅ propio | ✅ propio | Cada usuario debería consultar sus propios datos; ADMIN podría administrar usuarios |
 | `DELETE /api/usuarios/{id}` | ✅ | ❌ | ❌ | Se propone como una operación administrativa |
+| `POST /api/auth/login` | ✅ Público | ✅ Público | ✅ Público | Endpoint de autenticación; no requiere que el usuario ya posea una sesión o JWT |
+| `GET /api/alertas/medico/{id}?leida={estado}` | ✅ | ❌ | ✅ propio | El médico consulta sus alertas y puede filtrar entre leídas y no leídas || `POST /api/medicamentos` | ⚠️ | ❌ | ✅ relacionado | Los medicamentos se crean asociados a tratamientos y la funcionalidad fue planteada para el médico |
+| `GET /api/medicamentos/{id}` | ✅ | ✅ relacionado | ✅ relacionado | La medicación puede ser necesaria para el seguimiento del paciente, restringida a recursos relacionados |
+| `GET /api/medicamentos/tratamiento/{idTratamiento}` | ✅ | ✅ relacionado | ✅ relacionado | Permite consultar la medicación de un tratamiento relacionado |
+| `PUT /api/medicamentos/{id}` | ⚠️ | ❌ | ✅ relacionado | La modificación de una prescripción debería corresponder al médico; falta confirmar facultades de ADMIN |
+| `DELETE /api/medicamentos/{id}` | ⚠️ | ❌ | ✅ relacionado | La baja de una medicación debería corresponder al médico; falta confirmar facultades de ADMIN |
 
 ---
 
@@ -134,6 +168,9 @@ Las siguientes decisiones no se presentan como requisitos definitivos:
 2. Si un `ADMIN` puede crear o dar de baja tratamientos.
 3. Si un usuario con rol `MEDICO` puede crear turnos.
 4. Cómo funciona `POST /api/usuarios`: autorregistro, creación exclusiva por `ADMIN` u otro mecanismo.
+5. Si `ADMIN` puede crear, modificar o dar de baja medicamentos.
+6. Si `ADMIN` puede marcar como leídas alertas pertenecientes a médicos.
+7. Aunque B-08 actualmente permite `POST /api/usuarios` sin autenticación, debe definirse qué roles puede solicitar una cuenta creada mediante registro público para evitar que el cliente se otorgue privilegios administrativos.
 
 Estas decisiones deben ser confirmadas por el responsable del proyecto antes de implementar la autorización definitiva.
 
