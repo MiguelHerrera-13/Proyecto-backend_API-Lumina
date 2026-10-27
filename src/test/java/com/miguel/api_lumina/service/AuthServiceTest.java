@@ -1,8 +1,14 @@
 package com.miguel.api_lumina.service;
 
 import com.miguel.api_lumina.dto.AuthResponseDTO;
+import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
+import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
+import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
+import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
+import com.miguel.api_lumina.entity.PasswordResetTokenEntity;
 import com.miguel.api_lumina.entity.UsuarioEntity;
+import com.miguel.api_lumina.repository.PasswordResetTokenRepository;
 import com.miguel.api_lumina.repository.UsuarioRepository;
 import com.miguel.api_lumina.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,10 +18,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,13 +42,16 @@ public class AuthServiceTest {
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
     private PasswordEncoder passwordEncoder;
     private AuthService authService;
 
     @BeforeEach
     public void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        authService = new AuthService(usuarioRepository, passwordEncoder, jwtService);
+        authService = new AuthService(usuarioRepository, passwordEncoder, jwtService, passwordResetTokenRepository);
     }
 
     @Test
@@ -147,5 +161,204 @@ public class AuthServiceTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(request));
         verify(jwtService, never()).generateToken(any(), any(), any());
+    }
+
+    // --- Pruebas de B-16: Recuperación y reseteo de contraseña por token ---
+
+    @Test
+    @DisplayName("forgotPassword genera token temporal (15 min) e invalida tokens previos si el usuario existe y está activo")
+    public void testForgotPassword_Success_GeneratesToken() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(10L);
+        usuario.setEmail("activo@lumina.com");
+        usuario.setActivo(true);
+
+        PasswordResetTokenEntity tokenPrevio = new PasswordResetTokenEntity("token-viejo", usuario, LocalDateTime.now().plusMinutes(5));
+        tokenPrevio.setUsado(false);
+
+        when(usuarioRepository.findByEmail("activo@lumina.com")).thenReturn(Optional.of(usuario));
+        when(passwordResetTokenRepository.findByUsuarioAndUsadoFalse(usuario)).thenReturn(List.of(tokenPrevio));
+
+        ForgotPasswordRequestDTO request = new ForgotPasswordRequestDTO("activo@lumina.com");
+        ForgotPasswordResponseDTO response = authService.forgotPassword(request);
+
+        assertNotNull(response);
+        assertEquals("Si el correo electrónico está registrado, recibirás un enlace o token para restablecer tu contraseña.", response.getMensaje());
+
+        // Verificar que el token previo se invalidó
+        assertTrue(tokenPrevio.getUsado());
+        verify(passwordResetTokenRepository).saveAll(List.of(tokenPrevio));
+
+        // Verificar que se guardó un nuevo token con expiración de 15 minutos
+        ArgumentCaptor<PasswordResetTokenEntity> tokenCaptor = ArgumentCaptor.forClass(PasswordResetTokenEntity.class);
+        verify(passwordResetTokenRepository).save(tokenCaptor.capture());
+        PasswordResetTokenEntity nuevoToken = tokenCaptor.getValue();
+
+        assertNotNull(nuevoToken.getToken());
+        assertEquals(usuario, nuevoToken.getUsuario());
+        assertFalse(nuevoToken.getUsado());
+        assertTrue(nuevoToken.getFechaExpiracion().isAfter(LocalDateTime.now().plusMinutes(14)));
+        assertTrue(nuevoToken.getFechaExpiracion().isBefore(LocalDateTime.now().plusMinutes(16)));
+    }
+
+    @Test
+    @DisplayName("forgotPassword con anti-enumeración: si el email no existe retorna 200 sin revelar existencia ni crear token")
+    public void testForgotPassword_AntiEnumeration_NonExistentEmail() {
+        when(usuarioRepository.findByEmail("noexiste@lumina.com")).thenReturn(Optional.empty());
+
+        ForgotPasswordRequestDTO request = new ForgotPasswordRequestDTO("noexiste@lumina.com");
+        ForgotPasswordResponseDTO response = authService.forgotPassword(request);
+
+        assertNotNull(response);
+        assertEquals("Si el correo electrónico está registrado, recibirás un enlace o token para restablecer tu contraseña.", response.getMensaje());
+
+        // No debe guardar ningún token
+        verify(passwordResetTokenRepository, never()).save(any(PasswordResetTokenEntity.class));
+    }
+
+    @Test
+    @DisplayName("forgotPassword con anti-enumeración: si el usuario está inactivo retorna 200 sin generar token")
+    public void testForgotPassword_AntiEnumeration_InactiveUser() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(11L);
+        usuario.setEmail("inactivo@lumina.com");
+        usuario.setActivo(false);
+
+        when(usuarioRepository.findByEmail("inactivo@lumina.com")).thenReturn(Optional.of(usuario));
+
+        ForgotPasswordRequestDTO request = new ForgotPasswordRequestDTO("inactivo@lumina.com");
+        ForgotPasswordResponseDTO response = authService.forgotPassword(request);
+
+        assertNotNull(response);
+        assertEquals("Si el correo electrónico está registrado, recibirás un enlace o token para restablecer tu contraseña.", response.getMensaje());
+
+        // No debe generar token
+        verify(passwordResetTokenRepository, never()).save(any(PasswordResetTokenEntity.class));
+    }
+
+    @Test
+    @DisplayName("resetPassword actualiza la contraseña con BCrypt y marca el token como usado (un solo uso)")
+    public void testResetPassword_Success() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(12L);
+        usuario.setEmail("recuperar@lumina.com");
+        usuario.setPasswordHash("$2a$10$antiguaHash...");
+        usuario.setActivo(true);
+
+        PasswordResetTokenEntity resetToken = new PasswordResetTokenEntity(
+                "token-valido-123",
+                usuario,
+                LocalDateTime.now().plusMinutes(15)
+        );
+        resetToken.setUsado(false);
+
+        when(passwordResetTokenRepository.findByToken("token-valido-123")).thenReturn(Optional.of(resetToken));
+
+        ResetPasswordRequestDTO request = new ResetPasswordRequestDTO("token-valido-123", "nuevaPasswordSegura456");
+        ResetPasswordResponseDTO response = authService.resetPassword(request);
+
+        assertNotNull(response);
+        assertEquals("Contraseña restablecida exitosamente", response.getMensaje());
+
+        // Validar que el token quedó marcado como usado
+        assertTrue(resetToken.getUsado());
+        verify(passwordResetTokenRepository).save(resetToken);
+
+        // Validar que la nueva contraseña se encriptó con BCrypt
+        ArgumentCaptor<UsuarioEntity> userCaptor = ArgumentCaptor.forClass(UsuarioEntity.class);
+        verify(usuarioRepository).save(userCaptor.capture());
+        UsuarioEntity updatedUser = userCaptor.getValue();
+
+        assertTrue(passwordEncoder.matches("nuevaPasswordSegura456", updatedUser.getPasswordHash()));
+        assertTrue(updatedUser.getPasswordHash().startsWith("$2a$"));
+    }
+
+    @Test
+    @DisplayName("resetPassword falla si el token ya fue utilizado (token de un solo uso)")
+    public void testResetPassword_Failure_AlreadyUsed() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(13L);
+        usuario.setActivo(true);
+
+        PasswordResetTokenEntity resetToken = new PasswordResetTokenEntity(
+                "token-ya-usado",
+                usuario,
+                LocalDateTime.now().plusMinutes(10)
+        );
+        resetToken.setUsado(true); // Ya fue usado previamente
+
+        when(passwordResetTokenRepository.findByToken("token-ya-usado")).thenReturn(Optional.of(resetToken));
+
+        ResetPasswordRequestDTO request = new ResetPasswordRequestDTO("token-ya-usado", "otraPassword");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.resetPassword(request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("El token de recuperación ya ha sido utilizado", ex.getReason());
+
+        verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+    }
+
+    @Test
+    @DisplayName("resetPassword falla si el token está expirado (vencimiento estricto)")
+    public void testResetPassword_Failure_ExpiredToken() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(14L);
+        usuario.setActivo(true);
+
+        PasswordResetTokenEntity resetToken = new PasswordResetTokenEntity(
+                "token-expirado",
+                usuario,
+                LocalDateTime.now().minusMinutes(1) // Expirado hace un minuto
+        );
+        resetToken.setUsado(false);
+
+        when(passwordResetTokenRepository.findByToken("token-expirado")).thenReturn(Optional.of(resetToken));
+
+        ResetPasswordRequestDTO request = new ResetPasswordRequestDTO("token-expirado", "otraPassword");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.resetPassword(request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("El token de recuperación ha expirado", ex.getReason());
+
+        verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+    }
+
+    @Test
+    @DisplayName("resetPassword falla si el token no existe en el repositorio")
+    public void testResetPassword_Failure_TokenNotFound() {
+        when(passwordResetTokenRepository.findByToken("token-inexistente")).thenReturn(Optional.empty());
+
+        ResetPasswordRequestDTO request = new ResetPasswordRequestDTO("token-inexistente", "otraPassword");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.resetPassword(request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("El token de recuperación es inválido o no existe", ex.getReason());
+
+        verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+    }
+
+    @Test
+    @DisplayName("resetPassword falla si el usuario asociado al token está inactivo")
+    public void testResetPassword_Failure_InactiveUser() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(15L);
+        usuario.setActivo(false); // Inactivo
+
+        PasswordResetTokenEntity resetToken = new PasswordResetTokenEntity(
+                "token-usuario-inactivo",
+                usuario,
+                LocalDateTime.now().plusMinutes(10)
+        );
+        resetToken.setUsado(false);
+
+        when(passwordResetTokenRepository.findByToken("token-usuario-inactivo")).thenReturn(Optional.of(resetToken));
+
+        ResetPasswordRequestDTO request = new ResetPasswordRequestDTO("token-usuario-inactivo", "otraPassword");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.resetPassword(request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("La cuenta de usuario no está activa", ex.getReason());
+
+        verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
     }
 }

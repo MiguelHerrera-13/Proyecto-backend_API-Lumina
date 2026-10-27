@@ -95,4 +95,25 @@ public class SecurityEndpointProtectionTest {
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
+
+    @Test
+    @DisplayName("Petición a endpoint público (POST /api/auth/forgot-password) es accesible sin token")
+    public void testPublicForgotPasswordEndpoint_AccessibleWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"cualquiera@test.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensaje").exists());
+    }
+
+    @Test
+    @DisplayName("Petición a endpoint público (POST /api/auth/reset-password) es accesible sin token")
+    public void testPublicResetPasswordEndpoint_AccessibleWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"token-cualquiera\",\"nuevaPassword\":\"clave123\"}"))
+                // No debe arrojar 401 de filtro de seguridad (fallará por validación/token inexistente 400, pero no 401)
+                .andExpect(status().isBadRequest());
+    }
 }
+
