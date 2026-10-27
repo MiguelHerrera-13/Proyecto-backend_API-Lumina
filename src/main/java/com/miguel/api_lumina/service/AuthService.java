@@ -2,9 +2,12 @@ package com.miguel.api_lumina.service;
 
 import com.miguel.api_lumina.dto.AuthResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
+import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
+import com.miguel.api_lumina.entity.RefreshTokenEntity;
 import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.repository.UsuarioRepository;
 import com.miguel.api_lumina.security.JwtService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,11 +19,21 @@ public class AuthService {
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+        this(usuarioRepository, passwordEncoder, jwtService, null);
+    }
+
+    @Autowired
+    public AuthService(UsuarioRepository usuarioRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService,
+                       RefreshTokenService refreshTokenService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -52,7 +65,22 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(usuario.getEmail(), usuario.getIdUsuario(), usuario.getRol());
-        return new AuthResponseDTO(token, "Bearer", usuario.getEmail(), usuario.getRol());
+        String refreshTokenStr = null;
+
+        if (refreshTokenService != null) {
+            RefreshTokenEntity refreshToken = refreshTokenService.createRefreshToken(usuario);
+            refreshTokenStr = refreshToken.getToken();
+        }
+
+        return new AuthResponseDTO(token, "Bearer", usuario.getEmail(), usuario.getRol(), refreshTokenStr);
+    }
+
+    @Transactional
+    public AuthResponseDTO refreshToken(RefreshTokenRequestDTO request) {
+        if (refreshTokenService == null) {
+            throw new IllegalStateException("RefreshTokenService no está configurado");
+        }
+        return refreshTokenService.refreshAccessToken(request);
     }
 
     private boolean isBcryptHash(String hash) {
