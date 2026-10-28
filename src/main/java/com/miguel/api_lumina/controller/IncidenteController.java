@@ -42,3 +42,4 @@ public class IncidenteController {
         return ResponseEntity.ok(incidente);
     }
 }
+

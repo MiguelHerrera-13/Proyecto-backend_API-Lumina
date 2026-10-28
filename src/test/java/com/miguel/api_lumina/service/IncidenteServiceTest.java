@@ -202,3 +202,4 @@ class IncidenteServiceTest {
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 }
+

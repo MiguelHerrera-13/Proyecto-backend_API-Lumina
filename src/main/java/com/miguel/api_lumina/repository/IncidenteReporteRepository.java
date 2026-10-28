@@ -11,3 +11,4 @@ public interface IncidenteReporteRepository extends JpaRepository<IncidenteRepor
 
     List<IncidenteReporteEntity> findByReporte_IdReporte(Long idReporte);
 }
+

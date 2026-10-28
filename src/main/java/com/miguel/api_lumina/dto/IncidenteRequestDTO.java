@@ -59,3 +59,4 @@ public class IncidenteRequestDTO {
         this.fechaHora = fechaHora;
     }
 }
+

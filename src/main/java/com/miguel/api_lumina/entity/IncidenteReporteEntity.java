@@ -106,3 +106,4 @@ public class IncidenteReporteEntity {
         this.activo = activo;
     }
 }
+

@@ -93,3 +93,4 @@ public class IncidenteResponseDTO {
         this.activo = activo;
     }
 }
+
