@@ -1,5 +1,7 @@
 package com.miguel.api_lumina.service;
 
+import com.miguel.api_lumina.dto.AgendaDisponibilidadResponseDTO;
+import com.miguel.api_lumina.dto.IntervaloAgendaDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
 import com.miguel.api_lumina.entity.PacienteEntity;
@@ -15,6 +17,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -110,7 +114,7 @@ class TurnoServiceTest {
         assertEquals("El paciente no existe", exception.getMessage());
         verify(turnoRepository, never()).save(any(TurnoEntity.class));
     }
-    
+
     @Test
     void crearTurno_CuidadorInexistente_DeberiaLanzarExcepcion() {
         // Arrange
@@ -141,7 +145,6 @@ class TurnoServiceTest {
         TurnoRequestDTO request = new TurnoRequestDTO();
         request.setIdPaciente(1L);
         request.setIdCuidador(2L);
-        // Inicio posterior a fin
         request.setFechaHoraInicio(LocalDateTime.of(2026, 1, 1, 11, 0));
         request.setFechaHoraFin(LocalDateTime.of(2026, 1, 1, 10, 0));
 
@@ -152,5 +155,126 @@ class TurnoServiceTest {
 
         assertEquals("La fecha de inicio debe ser anterior a la de fin", exception.getMessage());
         verify(turnoRepository, never()).save(any(TurnoEntity.class));
+    }
+
+    @Test
+    void obtenerAgendaDisponibilidad_FechasValidas_CalculaHuecosLibres() {
+        // Arrange
+        Long profesionalId = 2L;
+        LocalDateTime desde = LocalDateTime.of(2026, 5, 10, 8, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 5, 10, 18, 0);
+
+        UsuarioEntity profesional = new UsuarioEntity();
+        profesional.setIdUsuario(2L);
+        profesional.setNombre("Dra. Perez");
+        profesional.setRol("MEDICO");
+
+        PacienteEntity paciente = new PacienteEntity();
+        paciente.setIdPaciente(1L);
+        paciente.setNombreCompleto("Paciente Uno");
+
+        TurnoEntity turno1 = new TurnoEntity();
+        turno1.setIdTurno(101L);
+        turno1.setPaciente(paciente);
+        turno1.setCuidador(profesional);
+        turno1.setFechaHoraInicio(LocalDateTime.of(2026, 5, 10, 10, 0));
+        turno1.setFechaHoraFin(LocalDateTime.of(2026, 5, 10, 12, 0));
+        turno1.setEstado("CONFIRMADO");
+
+        TurnoEntity turno2 = new TurnoEntity();
+        turno2.setIdTurno(102L);
+        turno2.setPaciente(paciente);
+        turno2.setCuidador(profesional);
+        turno2.setFechaHoraInicio(LocalDateTime.of(2026, 5, 10, 14, 0));
+        turno2.setFechaHoraFin(LocalDateTime.of(2026, 5, 10, 15, 30));
+        turno2.setEstado("CONFIRMADO");
+
+        List<TurnoEntity> turnosOcupados = List.of(turno1, turno2);
+
+        when(usuarioRepository.findById(profesionalId)).thenReturn(Optional.of(profesional));
+        when(turnoRepository.findAgendaProfesional(profesionalId, desde, hasta)).thenReturn(turnosOcupados);
+
+        // Act
+        AgendaDisponibilidadResponseDTO result = turnoService.obtenerAgendaDisponibilidad(profesionalId, desde, hasta);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(profesionalId, result.getProfesionalId());
+        assertEquals("Dra. Perez", result.getNombreProfesional());
+        assertEquals(2, result.getTurnosOcupados().size());
+
+        List<IntervaloAgendaDTO> huecos = result.getHuecosLibres();
+        assertNotNull(huecos);
+        assertEquals(3, huecos.size());
+
+        // Hueco 1: 08:00 a 10:00
+        assertEquals(desde, huecos.get(0).getInicio());
+        assertEquals(LocalDateTime.of(2026, 5, 10, 10, 0), huecos.get(0).getFin());
+
+        // Hueco 2: 12:00 a 14:00
+        assertEquals(LocalDateTime.of(2026, 5, 10, 12, 0), huecos.get(1).getInicio());
+        assertEquals(LocalDateTime.of(2026, 5, 10, 14, 0), huecos.get(1).getFin());
+
+        // Hueco 3: 15:30 a 18:00
+        assertEquals(LocalDateTime.of(2026, 5, 10, 15, 30), huecos.get(2).getInicio());
+        assertEquals(hasta, huecos.get(2).getFin());
+    }
+
+    @Test
+    void obtenerAgendaDisponibilidad_SinTurnos_TodoElRangoEsLibre() {
+        // Arrange
+        Long profesionalId = 2L;
+        LocalDateTime desde = LocalDateTime.of(2026, 5, 10, 8, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 5, 10, 12, 0);
+
+        UsuarioEntity profesional = new UsuarioEntity();
+        profesional.setIdUsuario(2L);
+        profesional.setNombre("Dr. Lopez");
+        profesional.setRol("CUIDADOR");
+
+        when(usuarioRepository.findById(profesionalId)).thenReturn(Optional.of(profesional));
+        when(turnoRepository.findAgendaProfesional(profesionalId, desde, hasta)).thenReturn(new ArrayList<>());
+
+        // Act
+        AgendaDisponibilidadResponseDTO result = turnoService.obtenerAgendaDisponibilidad(profesionalId, desde, hasta);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(0, result.getTurnosOcupados().size());
+        assertEquals(1, result.getHuecosLibres().size());
+        assertEquals(desde, result.getHuecosLibres().get(0).getInicio());
+        assertEquals(hasta, result.getHuecosLibres().get(0).getFin());
+    }
+
+    @Test
+    void obtenerAgendaDisponibilidad_DesdePosteriorAHasta_LanzaExcepcion() {
+        LocalDateTime desde = LocalDateTime.of(2026, 5, 10, 18, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 5, 10, 8, 0);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                turnoService.obtenerAgendaDisponibilidad(1L, desde, hasta)
+        );
+        assertTrue(ex.getMessage().contains("estrictamente anterior"));
+    }
+
+    @Test
+    void obtenerAgendaDisponibilidad_FechasNulas_LanzaExcepcion() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                turnoService.obtenerAgendaDisponibilidad(1L, null, LocalDateTime.now())
+        );
+        assertTrue(ex.getMessage().contains("son obligatorios"));
+    }
+
+    @Test
+    void obtenerAgendaDisponibilidad_ProfesionalInexistente_LanzaExcepcion() {
+        LocalDateTime desde = LocalDateTime.of(2026, 5, 10, 8, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 5, 10, 12, 0);
+
+        when(usuarioRepository.findById(999L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                turnoService.obtenerAgendaDisponibilidad(999L, desde, hasta)
+        );
+        assertTrue(ex.getMessage().contains("no existe"));
     }
 }
