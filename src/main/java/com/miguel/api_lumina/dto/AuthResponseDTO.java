@@ -6,6 +6,7 @@ public class AuthResponseDTO {
     private String tipo = "Bearer";
     private String email;
     private String rol;
+    private String refreshToken;
 
     public AuthResponseDTO() {
     }
@@ -15,6 +16,14 @@ public class AuthResponseDTO {
         this.tipo = tipo;
         this.email = email;
         this.rol = rol;
+    }
+
+    public AuthResponseDTO(String token, String tipo, String email, String rol, String refreshToken) {
+        this.token = token;
+        this.tipo = tipo;
+        this.email = email;
+        this.rol = rol;
+        this.refreshToken = refreshToken;
     }
 
     public String getToken() {
@@ -47,5 +56,13 @@ public class AuthResponseDTO {
 
     public void setRol(String rol) {
         this.rol = rol;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
     }
 }
