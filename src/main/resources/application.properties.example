@@ -17,3 +17,8 @@ jwt.secret=${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367
 # Tiempo de expiración del token en milisegundos (24 horas = 86400000 ms)
 jwt.expiration=86400000
 
+# Configuración recuperación de contraseña (duración en minutos: 15 a 30 min)
+auth.reset-token.expiration-minutes=15
+
+# Tiempo de expiración del Refresh Token (en días)
+jwt.refresh-expiration-days=7
