@@ -1,0 +1,292 @@
+{
+  "info": {
+    "_postman_id": "lumina-api-collection-v1",
+    "name": "Proyecto Lúmina - API REST",
+    "description": "Colección completa de pruebas de integración para el Proyecto Lúmina (Spring Boot + MySQL).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Usuarios y Roles (Issue #1)",
+      "item": [
+        {
+          "name": "1.1 Crear Usuario Médico",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Dr. Gregory House\",\n  \"email\": \"house@lumina.com\",\n  \"password\": \"Password123!\",\n  \"rol\": \"MEDICO\"\n}"
+            },
+            "url": "http://localhost:8080/api/usuarios"
+          }
+        },
+        {
+          "name": "1.2 Crear Usuario Cuidador",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Carlos Cuidador\",\n  \"email\": \"carlos@lumina.com\",\n  \"password\": \"Password123!\",\n  \"rol\": \"CUIDADOR\"\n}"
+            },
+            "url": "http://localhost:8080/api/usuarios"
+          }
+        },
+        {
+          "name": "1.3 Email Repetido (Debe dar 409 Conflict)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Dr. Gregory House\",\n  \"email\": \"house@lumina.com\",\n  \"password\": \"Password123!\",\n  \"rol\": \"MEDICO\"\n}"
+            },
+            "url": "http://localhost:8080/api/usuarios"
+          }
+        },
+        {
+          "name": "1.4 Consultar Usuario por ID",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/usuarios/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Pacientes",
+      "item": [
+        {
+          "name": "2.1 Crear Paciente",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombreCompleto\": \"Carlos Gómez\",\n  \"fechaNacimiento\": \"1975-04-12\",\n  \"diagnosticoFase\": \"Fase 1\"\n}"
+            },
+            "url": "http://localhost:8080/api/pacientes"
+          }
+        },
+        {
+          "name": "2.2 Consultar Paciente por ID",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/pacientes/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Turnos (Issue #2)",
+      "item": [
+        {
+          "name": "3.1 Asignar Turno",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPaciente\": 1,\n  \"idCuidador\": 2,\n  \"idMedico\": 1,\n  \"fechaHoraInicio\": \"2026-10-21T08:00:00\",\n  \"fechaHoraFin\": \"2026-10-21T16:00:00\"\n}"
+            },
+            "url": "http://localhost:8080/api/turnos"
+          }
+        },
+        {
+          "name": "3.2 Consultar Turno por ID",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/turnos/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Reportes Diarios (Issue #3 y #5)",
+      "item": [
+        {
+          "name": "4.1 Reporte Crítico (Dispara Alerta Automática)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idTurno\": 1,\n  \"temperatura\": 39.5,\n  \"presionArterial\": \"190/120\",\n  \"observacion\": \"Fiebre muy alta y presión arterial descompensada.\"\n}"
+            },
+            "url": "http://localhost:8080/api/reportes-diarios"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Alertas Clínicas (Issue #16 / B-10)",
+      "item": [
+        {
+          "name": "5.1 Consultar Alertas No Leídas (Por Defecto)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/alertas/medico/1"
+          }
+        },
+        {
+          "name": "5.2 Consultar Alertas Leídas (Filtro leida=true)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/alertas/medico/1?leida=true",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["api", "alertas", "medico", "1"],
+              "query": [{"key": "leida", "value": "true"}]
+            }
+          }
+        },
+        {
+          "name": "5.3 Marcar Alerta como Leída (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": "http://localhost:8080/api/alertas/medico/1/1/leida"
+          }
+        },
+        {
+          "name": "5.4 Prueba de Idempotencia (Reenviar PATCH)",
+          "request": {
+            "method": "PATCH",
+            "url": "http://localhost:8080/api/alertas/medico/1/1/leida"
+          }
+        },
+        {
+          "name": "5.5 Prueba de Seguridad (IDOR - 404 Not Found)",
+          "request": {
+            "method": "PATCH",
+            "url": "http://localhost:8080/api/alertas/medico/999/1/leida"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Tratamientos Médicos (Issue #4)",
+      "item": [
+        {
+          "name": "6.1 Crear Tratamiento",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPaciente\": 1,\n  \"idMedico\": 1,\n  \"descripcion\": \"Tratamiento de control de hipertensión y cuadro febril\",\n  \"fechaInicio\": \"2026-10-20\",\n  \"fechaFin\": \"2026-11-20\"\n}"
+            },
+            "url": "http://localhost:8080/api/tratamientos"
+          }
+        },
+        {
+          "name": "6.2 Consultar Tratamientos por Paciente",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/tratamientos/paciente/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Medicamentos (Issue B-09)",
+      "item": [
+        {
+          "name": "7.1 Prescribir Medicamento 1",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idTratamiento\": 1,\n  \"nombre\": \"Amoxicilina\",\n  \"dosis\": \"500 mg\",\n  \"frecuencia\": \"Cada 8 horas\"\n}"
+            },
+            "url": "http://localhost:8080/api/medicamentos"
+          }
+        },
+        {
+          "name": "7.2 Prescribir Medicamento 2",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idTratamiento\": 1,\n  \"nombre\": \"Paracetamol\",\n  \"dosis\": \"1 g\",\n  \"frecuencia\": \"Cada 8 horas en caso de fiebre\"\n}"
+            },
+            "url": "http://localhost:8080/api/medicamentos"
+          }
+        },
+        {
+          "name": "7.3 Listar Medicamentos de un Tratamiento",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/medicamentos/tratamiento/1"
+          }
+        },
+        {
+          "name": "7.4 Baja Lógica Medicamento (204 No Content)",
+          "request": {
+            "method": "DELETE",
+            "url": "http://localhost:8080/api/medicamentos/2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Historial Clínico Resumido (Issue #6)",
+      "item": [
+        {
+          "name": "8.1 Consultar Historial Completo del Paciente",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/pacientes/1/historial"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Incidentes y Observaciones Extraordinarias (Issue #43 - B-32)",
+      "item": [
+        {
+          "name": "9.1 Registrar Incidente Severidad ALTA (Dispara Alerta)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoIncidente\": \"CAIDA\",\n  \"descripcion\": \"Paciente tropezó al levantarse de la cama y sufrió una caída con golpe leve.\",\n  \"severidad\": \"ALTA\"\n}"
+            },
+            "url": "http://localhost:8080/api/reportes-diarios/1/incidentes"
+          }
+        },
+        {
+          "name": "9.2 Registrar Incidente Severidad LEVE (Sin Alerta)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoIncidente\": \"DESORIENTACION\",\n  \"descripcion\": \"Paciente presentó leve desorientación temporal luego de la siesta.\",\n  \"severidad\": \"LEVE\"\n}"
+            },
+            "url": "http://localhost:8080/api/reportes-diarios/1/incidentes"
+          }
+        },
+        {
+          "name": "9.3 Listar Incidentes del Reporte 1",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/reportes-diarios/1/incidentes"
+          }
+        },
+        {
+          "name": "9.4 Consultar Alertas No Leídas del Médico 1 (Verificar disparo)",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/api/alertas/medico/1"
+          }
+        }
+      ]
+    }
+  ]
+}
