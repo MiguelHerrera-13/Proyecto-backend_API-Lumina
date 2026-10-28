@@ -5,6 +5,7 @@ import com.miguel.api_lumina.dto.CancelarTurnoDTO;
 import com.miguel.api_lumina.dto.IntervaloAgendaDTO;
 import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoConflictoDTO;
+import com.miguel.api_lumina.dto.TurnoFiltroDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteResponseDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
@@ -15,7 +16,11 @@ import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.repository.PacienteRepository;
 import com.miguel.api_lumina.repository.TurnoRepository;
 import com.miguel.api_lumina.repository.UsuarioRepository;
+import com.miguel.api_lumina.specification.TurnoSpecification;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -356,6 +361,40 @@ public class TurnoService {
         response.setHuecosLibres(huecosLibres);
 
         return response;
+
+    public Page<TurnoResponseDTO> buscarTurnos(
+            Long pacienteId,
+            Long profesionalId,
+            Long medicoId,
+            Long cuidadorId,
+            String estado,
+            LocalDateTime fechaDesde,
+            LocalDateTime fechaHasta,
+            Pageable pageable
+    ) {
+        Specification<TurnoEntity> spec = TurnoSpecification.conFiltros(
+                pacienteId, profesionalId, medicoId, cuidadorId, estado, fechaDesde, fechaHasta
+        );
+        Page<TurnoEntity> turnosPage = turnoRepository.findAll(spec, pageable);
+        return turnosPage.map(this::mapToDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TurnoResponseDTO> buscarTurnos(TurnoFiltroDTO filtro, Pageable pageable) {
+        if (filtro == null) {
+            filtro = new TurnoFiltroDTO();
+        }
+        return buscarTurnos(
+                filtro.getPacienteId(),
+                filtro.getProfesionalId(),
+                filtro.getMedicoId(),
+                filtro.getCuidadorId(),
+                filtro.getEstado(),
+                filtro.getFechaDesde(),
+                filtro.getFechaHasta(),
+                pageable
+        );
+
     }
 
     private TurnoResponseDTO mapToDTO(TurnoEntity turno) {

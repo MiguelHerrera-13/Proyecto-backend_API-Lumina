@@ -17,6 +17,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -47,6 +52,7 @@ class TurnoControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(turnoController)
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new PageableHandlerMethodArgumentResolver())
                 .build();
     }
 
@@ -222,5 +228,71 @@ class TurnoControllerTest {
                         .param("desde", "2026-05-10T18:00:00")
                         .param("hasta", "2026-05-10T08:00:00"))
                 .andExpect(status().isBadRequest());
+
+    @DisplayName("GET /api/turnos con filtros combinados retorna 200 OK y página con resultados")
+    void testBuscarTurnos_ConFiltros_Retorna200YPagina() throws Exception {
+        TurnoResponseDTO dto1 = new TurnoResponseDTO();
+        dto1.setIdTurno(10L);
+        dto1.setNombrePaciente("Carlos Gomez");
+        dto1.setEstado("CONFIRMADO");
+
+        TurnoResponseDTO dto2 = new TurnoResponseDTO();
+        dto2.setIdTurno(11L);
+        dto2.setNombrePaciente("Maria Lopez");
+        dto2.setEstado("CONFIRMADO");
+
+        Page<TurnoResponseDTO> page = new PageImpl<>(List.of(dto1, dto2), PageRequest.of(0, 10), 2);
+
+        when(turnoService.buscarTurnos(
+                eq(1L), eq(2L), any(), any(), eq("CONFIRMADO"), any(), any(), any(Pageable.class)
+        )).thenReturn(page);
+
+        mockMvc.perform(get("/api/turnos")
+                        .param("pacienteId", "1")
+                        .param("profesionalId", "2")
+                        .param("estado", "CONFIRMADO")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].idTurno").value(10))
+                .andExpect(jsonPath("$.content[0].nombrePaciente").value("Carlos Gomez"))
+                .andExpect(jsonPath("$.content[1].idTurno").value(11))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    @DisplayName("GET /api/turnos sin coincidencias retorna 200 OK con lista vacía")
+    void testBuscarTurnos_SinCoincidencias_Retorna200YListaVacia() throws Exception {
+        Page<TurnoResponseDTO> pageVacia = new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 10), 0);
+
+        when(turnoService.buscarTurnos(
+                any(), any(), any(), any(), eq("INEXISTENTE"), any(), any(), any(Pageable.class)
+        )).thenReturn(pageVacia);
+
+        mockMvc.perform(get("/api/turnos")
+                        .param("estado", "INEXISTENTE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/turnos con paginación y ordenamiento configurable retorna 200 OK")
+    void testBuscarTurnos_PaginacionYOrden_Retorna200() throws Exception {
+        Page<TurnoResponseDTO> page = new PageImpl<>(Collections.emptyList(), PageRequest.of(1, 5), 15);
+
+        when(turnoService.buscarTurnos(
+                any(), any(), any(), any(), any(), any(), any(), any(Pageable.class)
+        )).thenReturn(page);
+
+        mockMvc.perform(get("/api/turnos")
+                        .param("page", "1")
+                        .param("size", "5")
+                        .param("sort", "fechaHoraInicio,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(15));
+
     }
 }

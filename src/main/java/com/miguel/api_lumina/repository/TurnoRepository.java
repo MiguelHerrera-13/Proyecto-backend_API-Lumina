@@ -2,6 +2,7 @@ package com.miguel.api_lumina.repository;
 
 import com.miguel.api_lumina.entity.TurnoEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
+public interface TurnoRepository extends JpaRepository<TurnoEntity, Long>, JpaSpecificationExecutor<TurnoEntity> {
 
     List<TurnoEntity> findByCuidador_IdUsuario(Long idCuidador);
 

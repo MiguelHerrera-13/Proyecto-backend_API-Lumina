@@ -9,6 +9,11 @@ import com.miguel.api_lumina.dto.TurnoRequestDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
 import com.miguel.api_lumina.service.TurnoService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +40,28 @@ public class TurnoController {
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @GetMapping
+    public ResponseEntity<Page<TurnoResponseDTO>> buscarTurnos(
+            @RequestParam(required = false) Long pacienteId,
+            @RequestParam(required = false) Long profesionalId,
+            @RequestParam(required = false) Long medicoId,
+            @RequestParam(required = false) Long cuidadorId,
+            @RequestParam(required = false) String estado,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaHasta,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime desde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime hasta,
+            @PageableDefault(page = 0, size = 10, sort = "fechaHoraInicio", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        LocalDateTime fDesde = (fechaDesde != null) ? fechaDesde : desde;
+        LocalDateTime fHasta = (fechaHasta != null) ? fechaHasta : hasta;
+
+        Page<TurnoResponseDTO> turnos = turnoService.buscarTurnos(
+                pacienteId, profesionalId, medicoId, cuidadorId, estado, fDesde, fHasta, pageable
+        );
+        return ResponseEntity.ok(turnos);
     }
 
     @PostMapping("/recurrentes")
