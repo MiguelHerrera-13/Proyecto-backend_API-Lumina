@@ -17,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -57,74 +58,60 @@ public class RefreshTokenServiceTest {
         assertEquals(usuario, token.getUsuario());
         assertFalse(token.getRevocado());
         assertTrue(token.getFechaExpiracion().isAfter(LocalDateTime.now().plusDays(6)));
-
+        assertTrue(token.getFechaExpiracion().isBefore(LocalDateTime.now().plusDays(8)));
         verify(refreshTokenRepository).save(any(RefreshTokenEntity.class));
     }
 
     @Test
-    @DisplayName("refreshAccessToken rota el refresh token (revoca el anterior, genera uno nuevo) y emite un nuevo JWT")
-    public void testRefreshAccessToken_Success_Rotation() {
+    @DisplayName("refreshAccessToken valida vigencia, rota el refresh token y devuelve un nuevo JWT")
+    public void testRefreshAccessToken_Success_RotatesToken() {
         UsuarioEntity usuario = new UsuarioEntity();
         usuario.setIdUsuario(2L);
         usuario.setEmail("doctor@lumina.com");
         usuario.setRol("MEDICO");
         usuario.setActivo(true);
 
-        String oldTokenStr = "old-refresh-token-uuid-123";
-        RefreshTokenEntity oldToken = new RefreshTokenEntity(oldTokenStr, usuario, LocalDateTime.now().plusDays(5));
+        RefreshTokenEntity oldToken = new RefreshTokenEntity("token-original-123", usuario, LocalDateTime.now().plusDays(5));
         oldToken.setRevocado(false);
 
-        when(refreshTokenRepository.findByToken(oldTokenStr)).thenReturn(Optional.of(oldToken));
+        when(refreshTokenRepository.findByToken("token-original-123")).thenReturn(Optional.of(oldToken));
         when(refreshTokenRepository.save(any(RefreshTokenEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtService.generateToken("doctor@lumina.com", 2L, "MEDICO")).thenReturn("new.generated.jwt.token");
+        when(jwtService.generateToken("doctor@lumina.com", 2L, "MEDICO")).thenReturn("nuevo-jwt-token-789");
 
-        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO(oldTokenStr);
+        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("token-original-123");
         AuthResponseDTO response = refreshTokenService.refreshAccessToken(request);
 
         assertNotNull(response);
-        assertEquals("new.generated.jwt.token", response.getToken());
+        assertEquals("nuevo-jwt-token-789", response.getToken());
         assertEquals("Bearer", response.getTipo());
         assertEquals("doctor@lumina.com", response.getEmail());
         assertEquals("MEDICO", response.getRol());
         assertNotNull(response.getRefreshToken());
-        assertNotEquals(oldTokenStr, response.getRefreshToken());
+        assertNotEquals("token-original-123", response.getRefreshToken());
 
-        // Verificar que el token anterior quedó marcado como revocado
+        // Comprobar que el token original quedó revocado
         assertTrue(oldToken.getRevocado());
 
-        // Verificar que se guardó el token viejo revocado y el nuevo token activo
-        verify(refreshTokenRepository, times(2)).save(any(RefreshTokenEntity.class));
+        // Comprobar que el nuevo token se persistió con revocado = false
+        ArgumentCaptor<RefreshTokenEntity> captor = ArgumentCaptor.forClass(RefreshTokenEntity.class);
+        verify(refreshTokenRepository, times(2)).save(captor.capture());
+        RefreshTokenEntity savedNewToken = captor.getAllValues().get(1);
+        assertFalse(savedNewToken.getRevocado());
+        assertEquals(usuario, savedNewToken.getUsuario());
     }
 
     @Test
-    @DisplayName("refreshAccessToken falla con 401 Unauthorized si el refresh token no existe")
-    public void testRefreshAccessToken_Failure_NotFound() {
-        when(refreshTokenRepository.findByToken("inexistente-token")).thenReturn(Optional.empty());
-
-        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("inexistente-token");
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> refreshTokenService.refreshAccessToken(request));
-
-        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
-        assertEquals("Refresh token inexistente o inválido", ex.getReason());
-        verify(jwtService, never()).generateToken(any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("refreshAccessToken falla con 401 Unauthorized si el refresh token ya fue revocado o usado")
-    public void testRefreshAccessToken_Failure_AlreadyRevoked() {
+    @DisplayName("refreshAccessToken falla con 401 Unauthorized si el token ya fue revocado (Ataque de repetición)")
+    public void testRefreshAccessToken_AlreadyRevoked_ThrowsUnauthorized() {
         UsuarioEntity usuario = new UsuarioEntity();
-        usuario.setIdUsuario(3L);
         usuario.setEmail("revocado@lumina.com");
-        usuario.setActivo(true);
 
-        RefreshTokenEntity revokedToken = new RefreshTokenEntity("token-ya-revocado", usuario, LocalDateTime.now().plusDays(2));
-        revokedToken.setRevocado(true);
+        RefreshTokenEntity revokedToken = new RefreshTokenEntity("token-revocado-123", usuario, LocalDateTime.now().plusDays(5));
+        revokedToken.setRevocado(true); // Ya consumido
 
-        when(refreshTokenRepository.findByToken("token-ya-revocado")).thenReturn(Optional.of(revokedToken));
+        when(refreshTokenRepository.findByToken("token-revocado-123")).thenReturn(Optional.of(revokedToken));
 
-        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("token-ya-revocado");
+        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("token-revocado-123");
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> refreshTokenService.refreshAccessToken(request));
@@ -135,14 +122,27 @@ public class RefreshTokenServiceTest {
     }
 
     @Test
-    @DisplayName("refreshAccessToken falla con 401 Unauthorized si el refresh token está expirado y lo revoca")
-    public void testRefreshAccessToken_Failure_Expired() {
-        UsuarioEntity usuario = new UsuarioEntity();
-        usuario.setIdUsuario(4L);
-        usuario.setEmail("expirado@lumina.com");
-        usuario.setActivo(true);
+    @DisplayName("refreshAccessToken falla con 401 Unauthorized si el token no existe en el repositorio")
+    public void testRefreshAccessToken_NonExistent_ThrowsUnauthorized() {
+        when(refreshTokenRepository.findByToken("token-fantasma")).thenReturn(Optional.empty());
 
-        RefreshTokenEntity expiredToken = new RefreshTokenEntity("token-expirado", usuario, LocalDateTime.now().minusMinutes(5));
+        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("token-fantasma");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> refreshTokenService.refreshAccessToken(request));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertEquals("Refresh token inexistente o inválido", ex.getReason());
+        verify(jwtService, never()).generateToken(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("refreshAccessToken falla con 401 Unauthorized si el token está expirado y lo marca como revocado")
+    public void testRefreshAccessToken_Expired_ThrowsUnauthorized() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail("expirado@lumina.com");
+
+        RefreshTokenEntity expiredToken = new RefreshTokenEntity("token-expirado", usuario, LocalDateTime.now().minusDays(1));
         expiredToken.setRevocado(false);
 
         when(refreshTokenRepository.findByToken("token-expirado")).thenReturn(Optional.of(expiredToken));
@@ -192,5 +192,42 @@ public class RefreshTokenServiceTest {
 
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
         assertEquals("Refresh token inexistente o inválido", ex.getReason());
+    }
+
+    @Test
+    @DisplayName("revokeRefreshToken marca el token como revocado si existe en la base de datos")
+    public void testRevokeRefreshToken_Success() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail("test@lumina.com");
+
+        RefreshTokenEntity token = new RefreshTokenEntity("token-a-revocar", usuario, LocalDateTime.now().plusDays(5));
+        token.setRevocado(false);
+
+        when(refreshTokenRepository.findByToken("token-a-revocar")).thenReturn(Optional.of(token));
+
+        refreshTokenService.revokeRefreshToken("token-a-revocar");
+
+        assertTrue(token.getRevocado());
+        verify(refreshTokenRepository).save(token);
+    }
+
+    @Test
+    @DisplayName("revokeAllUserTokens marca como revocados todos los tokens activos del usuario")
+    public void testRevokeAllUserTokens_Success() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail("test@lumina.com");
+
+        RefreshTokenEntity t1 = new RefreshTokenEntity("t1", usuario, LocalDateTime.now().plusDays(5));
+        t1.setRevocado(false);
+        RefreshTokenEntity t2 = new RefreshTokenEntity("t2", usuario, LocalDateTime.now().plusDays(3));
+        t2.setRevocado(false);
+
+        when(refreshTokenRepository.findByUsuarioAndRevocadoFalse(usuario)).thenReturn(List.of(t1, t2));
+
+        refreshTokenService.revokeAllUserTokens(usuario);
+
+        assertTrue(t1.getRevocado());
+        assertTrue(t2.getRevocado());
+        verify(refreshTokenRepository).saveAll(List.of(t1, t2));
     }
 }
