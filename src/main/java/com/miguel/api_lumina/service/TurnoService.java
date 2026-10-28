@@ -361,6 +361,7 @@ public class TurnoService {
         response.setHuecosLibres(huecosLibres);
 
         return response;
+    }
 
     public Page<TurnoResponseDTO> buscarTurnos(
             Long pacienteId,

@@ -535,6 +535,9 @@ class TurnoServiceTest {
                 turnoService.obtenerAgendaDisponibilidad(999L, desde, hasta)
         );
         assertTrue(ex.getMessage().contains("no existe"));
+    }
+
+    @Test
 
     void buscarTurnos_ConFiltros_RetornaPagina() {
         Pageable pageable = PageRequest.of(0, 10, Sort.by("fechaHoraInicio").ascending());

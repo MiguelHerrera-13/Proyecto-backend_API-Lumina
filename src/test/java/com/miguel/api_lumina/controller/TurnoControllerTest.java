@@ -228,6 +228,9 @@ class TurnoControllerTest {
                         .param("desde", "2026-05-10T18:00:00")
                         .param("hasta", "2026-05-10T08:00:00"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
 
     @DisplayName("GET /api/turnos con filtros combinados retorna 200 OK y página con resultados")
     void testBuscarTurnos_ConFiltros_Retorna200YPagina() throws Exception {
