@@ -62,3 +62,4 @@ public class ResumenIngestaResponseDTO {
         this.ingestas = ingestas;
     }
 }
+

@@ -89,3 +89,4 @@ public class ControlIngestaRequestDTO {
         this.observaciones = observaciones;
     }
 }
+

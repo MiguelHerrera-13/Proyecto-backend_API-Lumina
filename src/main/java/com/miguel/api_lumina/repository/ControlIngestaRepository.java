@@ -16,3 +16,4 @@ public interface ControlIngestaRepository extends JpaRepository<ControlIngestaEn
     @Query("SELECT COALESCE(SUM(c.aguaMl), 0) FROM ControlIngestaEntity c WHERE c.reporte.idReporte = :idReporte")
     Integer sumarAguaMlPorReporte(@Param("idReporte") Long idReporte);
 }
+

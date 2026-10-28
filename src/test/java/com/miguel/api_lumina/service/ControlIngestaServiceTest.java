@@ -194,3 +194,4 @@ class ControlIngestaServiceTest {
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 }
+

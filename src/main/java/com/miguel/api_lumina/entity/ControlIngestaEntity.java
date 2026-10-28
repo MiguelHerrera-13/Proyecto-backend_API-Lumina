@@ -131,3 +131,4 @@ public class ControlIngestaEntity {
         this.activo = activo;
     }
 }
+
