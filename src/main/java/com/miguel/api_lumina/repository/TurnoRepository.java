@@ -53,4 +53,15 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaInicio") LocalDateTime fechaInicio,
             @Param("fechaFin") LocalDateTime fechaFin
     );
+
+    @Query("SELECT t FROM TurnoEntity t " +
+           "WHERE (:profesionalId IS NULL OR t.medico.idUsuario = :profesionalId OR t.cuidador.idUsuario = :profesionalId) " +
+           "AND t.estado != 'CANCELADO' " +
+           "AND t.fechaHoraInicio < :hasta AND t.fechaHoraFin > :desde " +
+           "ORDER BY t.fechaHoraInicio ASC")
+    List<TurnoEntity> findAgendaProfesional(
+            @Param("profesionalId") Long profesionalId,
+            @Param("desde") LocalDateTime desde,
+            @Param("hasta") LocalDateTime hasta
+    );
 }

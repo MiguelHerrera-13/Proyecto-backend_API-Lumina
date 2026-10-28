@@ -1,6 +1,8 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.AgendaDisponibilidadResponseDTO;
 import com.miguel.api_lumina.dto.CancelarTurnoDTO;
+import com.miguel.api_lumina.dto.IntervaloAgendaDTO;
 import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoConflictoDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
@@ -20,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -178,5 +181,46 @@ class TurnoControllerTest {
                 .content(jsonRequest))
                 .andExpect(status().isConflict())
                 .andExpect(content().string("El médico ya tiene un turno asignado en el horario seleccionado"));
+    }
+
+    @Test
+    @DisplayName("GET /api/turnos/agenda con fechas válidas retorna 200 OK y agenda calculada")
+    public void obtenerAgenda_Valido_Retorna200() throws Exception {
+        LocalDateTime desde = LocalDateTime.of(2026, 5, 10, 8, 0);
+        LocalDateTime hasta = LocalDateTime.of(2026, 5, 10, 18, 0);
+
+        AgendaDisponibilidadResponseDTO agenda = new AgendaDisponibilidadResponseDTO();
+        agenda.setProfesionalId(2L);
+        agenda.setNombreProfesional("Dra. Perez");
+        agenda.setRolProfesional("MEDICO");
+        agenda.setDesde(desde);
+        agenda.setHasta(hasta);
+        agenda.setTurnosOcupados(Collections.emptyList());
+        agenda.setHuecosLibres(List.of(new IntervaloAgendaDTO(desde, hasta, "LIBRE", null, "Disponibilidad libre")));
+
+        when(turnoService.obtenerAgendaDisponibilidad(eq(2L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(agenda);
+
+        mockMvc.perform(get("/api/turnos/agenda")
+                        .param("profesionalId", "2")
+                        .param("desde", "2026-05-10T08:00:00")
+                        .param("hasta", "2026-05-10T18:00:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profesionalId").value(2))
+                .andExpect(jsonPath("$.nombreProfesional").value("Dra. Perez"))
+                .andExpect(jsonPath("$.huecosLibres[0].tipo").value("LIBRE"));
+    }
+
+    @Test
+    @DisplayName("GET /api/turnos/agenda con desde posterior a hasta retorna 400 Bad Request")
+    public void obtenerAgenda_RangoInvalido_Retorna400() throws Exception {
+        when(turnoService.obtenerAgendaDisponibilidad(eq(2L), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenThrow(new IllegalArgumentException("La fecha 'desde' debe ser estrictamente anterior a la fecha 'hasta'"));
+
+        mockMvc.perform(get("/api/turnos/agenda")
+                        .param("profesionalId", "2")
+                        .param("desde", "2026-05-10T18:00:00")
+                        .param("hasta", "2026-05-10T08:00:00"))
+                .andExpect(status().isBadRequest());
     }
 }

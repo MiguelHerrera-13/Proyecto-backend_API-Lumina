@@ -1,6 +1,8 @@
 package com.miguel.api_lumina.service;
 
+import com.miguel.api_lumina.dto.AgendaDisponibilidadResponseDTO;
 import com.miguel.api_lumina.dto.CancelarTurnoDTO;
+import com.miguel.api_lumina.dto.IntervaloAgendaDTO;
 import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoConflictoDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
@@ -220,7 +222,7 @@ public class TurnoService {
         }
 
         if (!dto.getNuevaFechaHoraInicio().isBefore(dto.getNuevaFechaHoraFin())) {
-            throw new IllegalArgumentException("La fecha de inicio debe ser anterior a la de fin");
+            throw new IllegalArgumentException("La nueva fecha de inicio debe ser anterior a la de fin");
         }
 
         if (dto.getMotivo() == null || dto.getMotivo().trim().length() < 10) {
@@ -232,35 +234,36 @@ public class TurnoService {
 
         validarTurnoModificable(turno, "reprogramar");
 
-        // Criterio de Aceptación: Validar disponibilidad horaria nuevamente
+        // Validar disponibilidad horaria de médico si tiene médico asignado
         if (turno.getMedico() != null) {
-            boolean hayConflictoMedico = turnoRepository.existsSuperposicionMedico(
+            boolean solapaMedico = turnoRepository.existsSuperposicionMedico(
                     idTurno,
                     turno.getMedico().getIdUsuario(),
                     dto.getNuevaFechaHoraInicio(),
                     dto.getNuevaFechaHoraFin()
             );
-            if (hayConflictoMedico) {
+            if (solapaMedico) {
                 throw new IllegalStateException("El médico ya tiene un turno asignado en el horario seleccionado");
             }
         }
 
+        // Validar disponibilidad horaria de cuidador
         if (turno.getCuidador() != null) {
-            boolean hayConflictoCuidador = turnoRepository.existsSuperposicionCuidador(
+            boolean solapaCuidador = turnoRepository.existsSuperposicionCuidador(
                     idTurno,
                     turno.getCuidador().getIdUsuario(),
                     dto.getNuevaFechaHoraInicio(),
                     dto.getNuevaFechaHoraFin()
             );
-            if (hayConflictoCuidador) {
+            if (solapaCuidador) {
                 throw new IllegalStateException("El cuidador ya tiene un turno asignado en el horario seleccionado");
             }
         }
 
         turno.setFechaHoraInicio(dto.getNuevaFechaHoraInicio());
         turno.setFechaHoraFin(dto.getNuevaFechaHoraFin());
-        turno.setEstado("REPROGRAMADO");
         turno.setMotivoReprogramacion(dto.getMotivo().trim());
+        turno.setEstado("REPROGRAMADO");
 
         TurnoEntity actualizado = turnoRepository.save(turno);
         return mapToDTO(actualizado);
@@ -293,12 +296,78 @@ public class TurnoService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public AgendaDisponibilidadResponseDTO obtenerAgendaDisponibilidad(Long profesionalId, LocalDateTime desde, LocalDateTime hasta) {
+        // Criterio de Aceptación: Parámetros desde y hasta obligatorios
+        if (desde == null || hasta == null) {
+            throw new IllegalArgumentException("Los parámetros 'desde' y 'hasta' son obligatorios");
+        }
+
+        // Criterio de Aceptación: Validación de que desde sea anterior a hasta
+        if (!desde.isBefore(hasta)) {
+            throw new IllegalArgumentException("La fecha 'desde' debe ser estrictamente anterior a la fecha 'hasta'");
+        }
+
+        UsuarioEntity profesional = null;
+        if (profesionalId != null) {
+            profesional = usuarioRepository.findById(profesionalId)
+                    .orElseThrow(() -> new IllegalArgumentException("El profesional indicado no existe"));
+        }
+
+        // Obtener turnos ordenados cronológicamente
+        List<TurnoEntity> turnos = turnoRepository.findAgendaProfesional(profesionalId, desde, hasta);
+        List<TurnoResponseDTO> turnosDTO = turnos.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+
+        // Calcular huecos libres de agenda cronológicamente
+        List<IntervaloAgendaDTO> huecosLibres = new ArrayList<>();
+        LocalDateTime cursor = desde;
+
+        for (TurnoEntity t : turnos) {
+            LocalDateTime inicioTurno = t.getFechaHoraInicio();
+            LocalDateTime finTurno = t.getFechaHoraFin();
+
+            if (inicioTurno.isAfter(cursor)) {
+                LocalDateTime finHueco = inicioTurno.isBefore(hasta) ? inicioTurno : hasta;
+                if (cursor.isBefore(finHueco)) {
+                    huecosLibres.add(new IntervaloAgendaDTO(cursor, finHueco, "LIBRE", null, "Disponibilidad libre"));
+                }
+            }
+
+            if (finTurno.isAfter(cursor)) {
+                cursor = finTurno;
+            }
+        }
+
+        if (cursor.isBefore(hasta)) {
+            huecosLibres.add(new IntervaloAgendaDTO(cursor, hasta, "LIBRE", null, "Disponibilidad libre"));
+        }
+
+        AgendaDisponibilidadResponseDTO response = new AgendaDisponibilidadResponseDTO();
+        response.setProfesionalId(profesionalId);
+        if (profesional != null) {
+            response.setNombreProfesional(profesional.getNombre());
+            response.setRolProfesional(profesional.getRol());
+        }
+        response.setDesde(desde);
+        response.setHasta(hasta);
+        response.setTurnosOcupados(turnosDTO);
+        response.setHuecosLibres(huecosLibres);
+
+        return response;
+    }
+
     private TurnoResponseDTO mapToDTO(TurnoEntity turno) {
         TurnoResponseDTO dto = new TurnoResponseDTO();
 
         dto.setIdTurno(turno.getIdTurno());
-        dto.setNombrePaciente(turno.getPaciente().getNombreCompleto());
-        dto.setNombreCuidador(turno.getCuidador().getNombre());
+        if (turno.getPaciente() != null) {
+            dto.setNombrePaciente(turno.getPaciente().getNombreCompleto());
+        }
+        if (turno.getCuidador() != null) {
+            dto.setNombreCuidador(turno.getCuidador().getNombre());
+        }
 
         if (turno.getMedico() != null) {
             dto.setIdMedico(turno.getMedico().getIdUsuario());
