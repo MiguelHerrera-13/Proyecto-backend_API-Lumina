@@ -49,6 +49,12 @@ public class TurnoEntity {
     @Column(name = "id_recurrencia", length = 36)
     private String idRecurrencia;
 
+    @Column(name = "motivo_cancelacion")
+    private String motivoCancelacion;
+
+    @Column(name = "motivo_reprogramacion")
+    private String motivoReprogramacion;
+
     @Version
     @Column(name = "version")
     private Integer version;
@@ -121,6 +127,22 @@ public class TurnoEntity {
 
     public void setIdRecurrencia(String idRecurrencia) {
         this.idRecurrencia = idRecurrencia;
+    }
+
+    public String getMotivoCancelacion() {
+        return motivoCancelacion;
+    }
+
+    public void setMotivoCancelacion(String motivoCancelacion) {
+        this.motivoCancelacion = motivoCancelacion;
+    }
+
+    public String getMotivoReprogramacion() {
+        return motivoReprogramacion;
+    }
+
+    public void setMotivoReprogramacion(String motivoReprogramacion) {
+        this.motivoReprogramacion = motivoReprogramacion;
     }
 
     public Integer getVersion() {

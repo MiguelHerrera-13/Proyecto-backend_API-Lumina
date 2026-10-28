@@ -1,5 +1,7 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.CancelarTurnoDTO;
+import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteResponseDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
@@ -62,5 +64,35 @@ public class TurnoController {
     public ResponseEntity<List<TurnoResponseDTO>> obtenerTurnosPorCuidador(@PathVariable Long idCuidador) {
         List<TurnoResponseDTO> turnos = turnoService.obtenerTurnosPorCuidador(idCuidador);
         return ResponseEntity.ok(turnos);
+    }
+
+    @PostMapping("/{id}/cancelar")
+    public ResponseEntity<?> cancelarTurno(
+            @PathVariable Long id,
+            @Valid @RequestBody CancelarTurnoDTO dto
+    ) {
+        try {
+            TurnoResponseDTO response = turnoService.cancelarTurno(id, dto);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.CONFLICT);
+        }
+    }
+
+    @PostMapping("/{id}/reprogramar")
+    public ResponseEntity<?> reprogramarTurno(
+            @PathVariable Long id,
+            @Valid @RequestBody ReprogramarTurnoDTO dto
+    ) {
+        try {
+            TurnoResponseDTO response = turnoService.reprogramarTurno(id, dto);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.CONFLICT);
+        }
     }
 }

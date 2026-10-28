@@ -18,13 +18,39 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
     List<TurnoEntity> findByIdRecurrencia(String idRecurrencia);
 
-    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t WHERE t.cuidador.idUsuario = :idCuidador AND t.fechaHoraInicio < :fin AND t.fechaHoraFin > :inicio")
+    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t WHERE t.cuidador.idUsuario = :idCuidador AND t.estado != 'CANCELADO' AND t.fechaHoraInicio < :fin AND t.fechaHoraFin > :inicio")
     boolean existeSolapamientoCuidador(@Param("idCuidador") Long idCuidador,
                                       @Param("inicio") LocalDateTime inicio,
                                       @Param("fin") LocalDateTime fin);
 
-    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t WHERE t.paciente.idPaciente = :idPaciente AND t.fechaHoraInicio < :fin AND t.fechaHoraFin > :inicio")
+    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t WHERE t.paciente.idPaciente = :idPaciente AND t.estado != 'CANCELADO' AND t.fechaHoraInicio < :fin AND t.fechaHoraFin > :inicio")
     boolean existeSolapamientoPaciente(@Param("idPaciente") Long idPaciente,
                                       @Param("inicio") LocalDateTime inicio,
                                       @Param("fin") LocalDateTime fin);
+
+    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t " +
+           "WHERE t.idTurno != :idTurno " +
+           "AND t.medico.idUsuario = :idMedico " +
+           "AND t.estado != 'CANCELADO' " +
+           "AND t.fechaHoraInicio < :fechaFin " +
+           "AND t.fechaHoraFin > :fechaInicio")
+    boolean existsSuperposicionMedico(
+            @Param("idTurno") Long idTurno,
+            @Param("idMedico") Long idMedico,
+            @Param("fechaInicio") LocalDateTime fechaInicio,
+            @Param("fechaFin") LocalDateTime fechaFin
+    );
+
+    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t " +
+           "WHERE t.idTurno != :idTurno " +
+           "AND t.cuidador.idUsuario = :idCuidador " +
+           "AND t.estado != 'CANCELADO' " +
+           "AND t.fechaHoraInicio < :fechaFin " +
+           "AND t.fechaHoraFin > :fechaInicio")
+    boolean existsSuperposicionCuidador(
+            @Param("idTurno") Long idTurno,
+            @Param("idCuidador") Long idCuidador,
+            @Param("fechaInicio") LocalDateTime fechaInicio,
+            @Param("fechaFin") LocalDateTime fechaFin
+    );
 }

@@ -1,5 +1,7 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.CancelarTurnoDTO;
+import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoConflictoDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteResponseDTO;
@@ -102,5 +104,79 @@ class TurnoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].idTurno").value(10L))
                 .andExpect(jsonPath("$[0].idRecurrencia").value("rec-uuid"));
+    }
+
+    @Test
+    @DisplayName("POST /api/turnos/{id}/cancelar con motivo válido retorna 200 y estado CANCELADO")
+    void testCancelarTurno_Exitoso() throws Exception {
+        String jsonRequest = "{\"motivo\":\"Paciente presenta cuadro febril y debe guardar reposo\"}";
+
+        TurnoResponseDTO response = new TurnoResponseDTO();
+        response.setIdTurno(1L);
+        response.setEstado("CANCELADO");
+        response.setMotivoCancelacion("Paciente presenta cuadro febril y debe guardar reposo");
+
+        when(turnoService.cancelarTurno(eq(1L), any(CancelarTurnoDTO.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/turnos/1/cancelar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idTurno").value(1))
+                .andExpect(jsonPath("$.estado").value("CANCELADO"))
+                .andExpect(jsonPath("$.motivoCancelacion").value("Paciente presenta cuadro febril y debe guardar reposo"));
+    }
+
+    @Test
+    @DisplayName("POST /api/turnos/{id}/cancelar con turno finalizado retorna 409 Conflict")
+    void testCancelarTurno_ConflictoEstado() throws Exception {
+        String jsonRequest = "{\"motivo\":\"Paciente presenta cuadro febril y debe guardar reposo\"}";
+
+        when(turnoService.cancelarTurno(eq(1L), any(CancelarTurnoDTO.class)))
+                .thenThrow(new IllegalStateException("No se puede cancelar un turno que ya ha sido finalizado"));
+
+        mockMvc.perform(post("/api/turnos/1/cancelar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isConflict())
+                .andExpect(content().string("No se puede cancelar un turno que ya ha sido finalizado"));
+    }
+
+    @Test
+    @DisplayName("POST /api/turnos/{id}/reprogramar con datos válidos retorna 200 y estado REPROGRAMADO")
+    void testReprogramarTurno_Exitoso() throws Exception {
+        String jsonRequest = "{\"nuevaFechaHoraInicio\":\"2026-03-10T10:00:00\",\"nuevaFechaHoraFin\":\"2026-03-10T11:00:00\",\"motivo\":\"Solicitud justificada por viaje laboral familiar\"}";
+
+        TurnoResponseDTO response = new TurnoResponseDTO();
+        response.setIdTurno(1L);
+        response.setEstado("REPROGRAMADO");
+        response.setFechaHoraInicio(LocalDateTime.of(2026, 3, 10, 10, 0));
+        response.setFechaHoraFin(LocalDateTime.of(2026, 3, 10, 11, 0));
+        response.setMotivoReprogramacion("Solicitud justificada por viaje laboral familiar");
+
+        when(turnoService.reprogramarTurno(eq(1L), any(ReprogramarTurnoDTO.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/turnos/1/reprogramar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idTurno").value(1))
+                .andExpect(jsonPath("$.estado").value("REPROGRAMADO"))
+                .andExpect(jsonPath("$.motivoReprogramacion").value("Solicitud justificada por viaje laboral familiar"));
+    }
+
+    @Test
+    @DisplayName("POST /api/turnos/{id}/reprogramar con conflicto de horario retorna 409 Conflict")
+    void testReprogramarTurno_ConflictoDisponibilidad() throws Exception {
+        String jsonRequest = "{\"nuevaFechaHoraInicio\":\"2026-03-10T10:00:00\",\"nuevaFechaHoraFin\":\"2026-03-10T11:00:00\",\"motivo\":\"Solicitud justificada por viaje laboral familiar\"}";
+
+        when(turnoService.reprogramarTurno(eq(1L), any(ReprogramarTurnoDTO.class)))
+                .thenThrow(new IllegalStateException("El médico ya tiene un turno asignado en el horario seleccionado"));
+
+        mockMvc.perform(post("/api/turnos/1/reprogramar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonRequest))
+                .andExpect(status().isConflict())
+                .andExpect(content().string("El médico ya tiene un turno asignado en el horario seleccionado"));
     }
 }

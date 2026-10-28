@@ -1,5 +1,7 @@
 package com.miguel.api_lumina.service;
 
+import com.miguel.api_lumina.dto.CancelarTurnoDTO;
+import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteResponseDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
@@ -24,6 +26,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -284,5 +287,145 @@ class TurnoServiceTest {
 
         assertEquals(1, lista.size());
         assertEquals("rec-123-uuid", lista.get(0).getIdRecurrencia());
+    }
+
+    @Test
+    void cancelarTurno_Valido_DeberiaCancelarTurno() {
+        TurnoEntity turno = crearTurnoEntityBase(1L, "PENDIENTE");
+        CancelarTurnoDTO dto = new CancelarTurnoDTO("El paciente presenta cuadro febril y debe guardar reposo");
+
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.save(any(TurnoEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TurnoResponseDTO response = turnoService.cancelarTurno(1L, dto);
+
+        assertNotNull(response);
+        assertEquals("CANCELADO", response.getEstado());
+        assertEquals("El paciente presenta cuadro febril y debe guardar reposo", response.getMotivoCancelacion());
+        verify(turnoRepository).save(turno);
+    }
+
+    @Test
+    void cancelarTurno_MotivoMenorA10Caracteres_DeberiaLanzarExcepcion() {
+        CancelarTurnoDTO dto = new CancelarTurnoDTO("Fiebre");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
+            turnoService.cancelarTurno(1L, dto);
+        });
+
+        assertTrue(ex.getMessage().contains("al menos 10 caracteres"));
+        verify(turnoRepository, never()).save(any(TurnoEntity.class));
+    }
+
+    @Test
+    void cancelarTurno_TurnoFinalizado_DeberiaLanzarExcepcion() {
+        TurnoEntity turno = crearTurnoEntityBase(1L, "FINALIZADO");
+        CancelarTurnoDTO dto = new CancelarTurnoDTO("El paciente presenta cuadro febril y debe guardar reposo");
+
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turno));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+            turnoService.cancelarTurno(1L, dto);
+        });
+
+        assertTrue(ex.getMessage().contains("ya ha sido finalizado"));
+        verify(turnoRepository, never()).save(any(TurnoEntity.class));
+    }
+
+    @Test
+    void cancelarTurno_TurnoYaCancelado_DeberiaLanzarExcepcion() {
+        TurnoEntity turno = crearTurnoEntityBase(1L, "CANCELADO");
+        CancelarTurnoDTO dto = new CancelarTurnoDTO("El paciente presenta cuadro febril y debe guardar reposo");
+
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turno));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+            turnoService.cancelarTurno(1L, dto);
+        });
+
+        assertTrue(ex.getMessage().contains("ya se encuentra cancelado"));
+        verify(turnoRepository, never()).save(any(TurnoEntity.class));
+    }
+
+    @Test
+    void reprogramarTurno_Valido_DeberiaReprogramarTurno() {
+        TurnoEntity turno = crearTurnoEntityBase(1L, "PENDIENTE");
+        LocalDateTime nuevoInicio = LocalDateTime.of(2026, 2, 1, 14, 0);
+        LocalDateTime nuevoFin = LocalDateTime.of(2026, 2, 1, 15, 0);
+        ReprogramarTurnoDTO dto = new ReprogramarTurnoDTO(nuevoInicio, nuevoFin, "Solicitud del familiar por viaje laboral");
+
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.existsSuperposicionMedico(eq(1L), anyLong(), eq(nuevoInicio), eq(nuevoFin))).thenReturn(false);
+        when(turnoRepository.existsSuperposicionCuidador(eq(1L), anyLong(), eq(nuevoInicio), eq(nuevoFin))).thenReturn(false);
+        when(turnoRepository.save(any(TurnoEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TurnoResponseDTO response = turnoService.reprogramarTurno(1L, dto);
+
+        assertNotNull(response);
+        assertEquals("REPROGRAMADO", response.getEstado());
+        assertEquals(nuevoInicio, response.getFechaHoraInicio());
+        assertEquals(nuevoFin, response.getFechaHoraFin());
+        assertEquals("Solicitud del familiar por viaje laboral", response.getMotivoReprogramacion());
+        verify(turnoRepository).save(turno);
+    }
+
+    @Test
+    void reprogramarTurno_HorarioSuperpuestoMedico_DeberiaLanzarExcepcion() {
+        TurnoEntity turno = crearTurnoEntityBase(1L, "PENDIENTE");
+        LocalDateTime nuevoInicio = LocalDateTime.of(2026, 2, 1, 14, 0);
+        LocalDateTime nuevoFin = LocalDateTime.of(2026, 2, 1, 15, 0);
+        ReprogramarTurnoDTO dto = new ReprogramarTurnoDTO(nuevoInicio, nuevoFin, "Solicitud del familiar por viaje laboral");
+
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.existsSuperposicionMedico(eq(1L), anyLong(), eq(nuevoInicio), eq(nuevoFin))).thenReturn(true);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+            turnoService.reprogramarTurno(1L, dto);
+        });
+
+        assertTrue(ex.getMessage().contains("médico ya tiene un turno"));
+        verify(turnoRepository, never()).save(any(TurnoEntity.class));
+    }
+
+    @Test
+    void reprogramarTurno_TurnoFinalizado_DeberiaLanzarExcepcion() {
+        TurnoEntity turno = crearTurnoEntityBase(1L, "FINALIZADO");
+        LocalDateTime nuevoInicio = LocalDateTime.of(2026, 2, 1, 14, 0);
+        LocalDateTime nuevoFin = LocalDateTime.of(2026, 2, 1, 15, 0);
+        ReprogramarTurnoDTO dto = new ReprogramarTurnoDTO(nuevoInicio, nuevoFin, "Solicitud del familiar por viaje laboral");
+
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turno));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+            turnoService.reprogramarTurno(1L, dto);
+        });
+
+        assertTrue(ex.getMessage().contains("ya ha sido finalizado"));
+        verify(turnoRepository, never()).save(any(TurnoEntity.class));
+    }
+
+    private TurnoEntity crearTurnoEntityBase(Long idTurno, String estado) {
+        PacienteEntity paciente = new PacienteEntity();
+        paciente.setIdPaciente(1L);
+        paciente.setNombreCompleto("Paciente Test");
+
+        UsuarioEntity cuidador = new UsuarioEntity();
+        cuidador.setIdUsuario(2L);
+        cuidador.setNombre("Cuidador Test");
+
+        UsuarioEntity medico = new UsuarioEntity();
+        medico.setIdUsuario(3L);
+        medico.setNombre("Dr. Perez");
+        medico.setRol("MEDICO");
+
+        TurnoEntity turno = new TurnoEntity();
+        turno.setIdTurno(idTurno);
+        turno.setPaciente(paciente);
+        turno.setCuidador(cuidador);
+        turno.setMedico(medico);
+        turno.setFechaHoraInicio(LocalDateTime.of(2026, 1, 15, 10, 0));
+        turno.setFechaHoraFin(LocalDateTime.of(2026, 1, 15, 11, 0));
+        turno.setEstado(estado);
+        return turno;
     }
 }

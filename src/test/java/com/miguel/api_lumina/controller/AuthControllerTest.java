@@ -2,6 +2,8 @@ package com.miguel.api_lumina.controller;
 
 import tools.jackson.databind.ObjectMapper;
 import com.miguel.api_lumina.dto.AuthResponseDTO;
+import com.miguel.api_lumina.dto.ChangePasswordRequestDTO;
+import com.miguel.api_lumina.dto.ChangePasswordResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
@@ -28,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -273,5 +276,51 @@ public class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.mensaje").value("Sesión cerrada exitosamente"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password con datos válidos retorna 200")
+    public void testChangePassword_Success() throws Exception {
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO("ClaveActual123!", "NuevaClaveSegura2026!", "NuevaClaveSegura2026!");
+        ChangePasswordResponseDTO response = new ChangePasswordResponseDTO("Contraseña actualizada exitosamente");
+
+        when(authService.changePassword(any(), any(), any())).thenReturn(response);
+
+        mockMvc.perform(put("/api/auth/change-password")
+                        .header("Authorization", "Bearer valid.jwt.token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensaje").value("Contraseña actualizada exitosamente"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password con contraseña actual incorrecta retorna 400 Bad Request")
+    public void testChangePassword_WrongCurrentPassword() throws Exception {
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO("ClaveErronea123", "NuevaClaveSegura2026!", "NuevaClaveSegura2026!");
+
+        when(authService.changePassword(any(), any(), any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual no coincide"));
+
+        mockMvc.perform(put("/api/auth/change-password")
+                        .header("Authorization", "Bearer valid.jwt.token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("La contraseña actual no coincide"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password con nueva contraseña que no cumple complejidad retorna 400 Bad Request")
+    public void testChangePassword_WeakPassword_Validation() throws Exception {
+        // Contraseña sin números ni mayúsculas, menor a 8 caracteres
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO("ClaveActual123!", "simple", "simple");
+
+        mockMvc.perform(put("/api/auth/change-password")
+                        .header("Authorization", "Bearer valid.jwt.token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.nuevaPassword").exists());
     }
 }
