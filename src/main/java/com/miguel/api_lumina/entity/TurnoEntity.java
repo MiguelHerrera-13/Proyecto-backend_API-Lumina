@@ -46,6 +46,9 @@ public class TurnoEntity {
     @Column(name = "estado")
     private String estado;
 
+    @Column(name = "id_recurrencia", length = 36)
+    private String idRecurrencia;
+
     @Version
     @Column(name = "version")
     private Integer version;
@@ -112,6 +115,14 @@ public class TurnoEntity {
         this.estado = estado;
     }
 
+    public String getIdRecurrencia() {
+        return idRecurrencia;
+    }
+
+    public void setIdRecurrencia(String idRecurrencia) {
+        this.idRecurrencia = idRecurrencia;
+    }
+
     public Integer getVersion() {
         return version;
     }
@@ -127,5 +138,4 @@ public class TurnoEntity {
     public void setActivo(Boolean activo) {
         this.activo = activo;
     }
-
 }

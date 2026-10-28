@@ -1,8 +1,11 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
+import com.miguel.api_lumina.dto.TurnoRecurrenteResponseDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
 import com.miguel.api_lumina.service.TurnoService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,13 +23,29 @@ public class TurnoController {
     }
 
     @PostMapping
-    public ResponseEntity<?> crearTurno(@RequestBody TurnoRequestDTO dto) {
+    public ResponseEntity<?> crearTurno(@Valid @RequestBody TurnoRequestDTO dto) {
         try {
             TurnoResponseDTO response = turnoService.crearTurno(dto);
             return new ResponseEntity<>(response, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @PostMapping("/recurrentes")
+    public ResponseEntity<?> generarTurnosRecurrentes(@Valid @RequestBody TurnoRecurrenteRequestDTO dto) {
+        try {
+            TurnoRecurrenteResponseDTO response = turnoService.generarTurnosRecurrentes(dto);
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @GetMapping("/recurrencia/{idRecurrencia}")
+    public ResponseEntity<List<TurnoResponseDTO>> obtenerTurnosPorRecurrencia(@PathVariable String idRecurrencia) {
+        List<TurnoResponseDTO> turnos = turnoService.obtenerTurnosPorRecurrencia(idRecurrencia);
+        return ResponseEntity.ok(turnos);
     }
 
     @GetMapping("/{id}")
