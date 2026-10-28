@@ -2,6 +2,7 @@ package com.miguel.api_lumina.service;
 
 import com.miguel.api_lumina.dto.CancelarTurnoDTO;
 import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
+import com.miguel.api_lumina.dto.TurnoFiltroDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
 import com.miguel.api_lumina.entity.PacienteEntity;
@@ -15,12 +16,21 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class TurnoServiceTest {
@@ -262,6 +272,60 @@ class TurnoServiceTest {
 
         assertTrue(ex.getMessage().contains("ya ha sido finalizado"));
         verify(turnoRepository, never()).save(any(TurnoEntity.class));
+    }
+
+    @Test
+    void buscarTurnos_ConFiltros_RetornaPagina() {
+        Pageable pageable = PageRequest.of(0, 10, Sort.by("fechaHoraInicio").ascending());
+        TurnoEntity turno1 = crearTurnoEntityBase(10L, "CONFIRMADO");
+        TurnoEntity turno2 = crearTurnoEntityBase(11L, "CONFIRMADO");
+        Page<TurnoEntity> page = new PageImpl<>(List.of(turno1, turno2), pageable, 2);
+
+        when(turnoRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+
+        Page<TurnoResponseDTO> resultado = turnoService.buscarTurnos(
+                1L, 2L, null, null, "CONFIRMADO",
+                LocalDateTime.of(2026, 1, 1, 0, 0),
+                LocalDateTime.of(2026, 1, 31, 23, 59),
+                pageable
+        );
+
+        assertNotNull(resultado);
+        assertEquals(2, resultado.getTotalElements());
+        assertEquals(10L, resultado.getContent().get(0).getIdTurno());
+        assertEquals("Paciente Test", resultado.getContent().get(0).getNombrePaciente());
+        verify(turnoRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    void buscarTurnos_SinCoincidencias_RetornaPaginaVacia() {
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<TurnoEntity> pageVacia = new PageImpl<>(Collections.emptyList(), pageable, 0);
+
+        when(turnoRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(pageVacia);
+
+        Page<TurnoResponseDTO> resultado = turnoService.buscarTurnos(
+                999L, null, null, null, "CANCELADO", null, null, pageable
+        );
+
+        assertNotNull(resultado);
+        assertTrue(resultado.isEmpty());
+        assertEquals(0, resultado.getTotalElements());
+        verify(turnoRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    void buscarTurnos_ConFiltroDTO_InvocaRepositorio() {
+        Pageable pageable = PageRequest.of(0, 5);
+        TurnoFiltroDTO filtro = new TurnoFiltroDTO(1L, null, 3L, null, "PENDIENTE", null, null);
+        Page<TurnoEntity> pageVacia = new PageImpl<>(Collections.emptyList(), pageable, 0);
+
+        when(turnoRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(pageVacia);
+
+        Page<TurnoResponseDTO> resultado = turnoService.buscarTurnos(filtro, pageable);
+
+        assertNotNull(resultado);
+        verify(turnoRepository).findAll(any(Specification.class), eq(pageable));
     }
 
     private TurnoEntity crearTurnoEntityBase(Long idTurno, String estado) {
