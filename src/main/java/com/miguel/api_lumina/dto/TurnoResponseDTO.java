@@ -12,6 +12,7 @@ public class TurnoResponseDTO {
     private LocalDateTime fechaHoraInicio;
     private LocalDateTime fechaHoraFin;
     private String estado;
+    private String idRecurrencia;
     private String motivoCancelacion;
     private String motivoReprogramacion;
 
@@ -80,6 +81,14 @@ public class TurnoResponseDTO {
 
     public void setEstado(String estado) {
         this.estado = estado;
+    }
+
+    public String getIdRecurrencia() {
+        return idRecurrencia;
+    }
+
+    public void setIdRecurrencia(String idRecurrencia) {
+        this.idRecurrencia = idRecurrencia;
     }
 
     public String getMotivoCancelacion() {
