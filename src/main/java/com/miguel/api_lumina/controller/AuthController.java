@@ -1,6 +1,8 @@
 package com.miguel.api_lumina.controller;
 
 import com.miguel.api_lumina.dto.AuthResponseDTO;
+import com.miguel.api_lumina.dto.ChangePasswordRequestDTO;
+import com.miguel.api_lumina.dto.ChangePasswordResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
@@ -12,7 +14,9 @@ import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
 import com.miguel.api_lumina.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +50,16 @@ public class AuthController {
             @RequestBody(required = false) LogoutRequestDTO request
     ) {
         LogoutResponseDTO response = authService.logout(authHeader, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<ChangePasswordResponseDTO> changePassword(
+            Authentication authentication,
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @Valid @RequestBody ChangePasswordRequestDTO request
+    ) {
+        ChangePasswordResponseDTO response = authService.changePassword(authentication, authHeader, request);
         return ResponseEntity.ok(response);
     }
 

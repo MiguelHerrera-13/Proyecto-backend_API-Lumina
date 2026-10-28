@@ -1,6 +1,8 @@
 package com.miguel.api_lumina.service;
 
 import com.miguel.api_lumina.dto.AuthResponseDTO;
+import com.miguel.api_lumina.dto.ChangePasswordRequestDTO;
+import com.miguel.api_lumina.dto.ChangePasswordResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
@@ -22,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,11 +34,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final Pattern PASSWORD_COMPLEXITY_PATTERN = Pattern.compile("^(?=.*[A-Z])(?=.*\\d).{8,}$");
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
@@ -237,6 +242,65 @@ public class AuthService {
         log.info("Contraseña actualizada exitosamente para el usuario [{}] mediante token de recuperación", usuario.getEmail());
 
         return new ResetPasswordResponseDTO("Contraseña restablecida exitosamente");
+    }
+
+    @Transactional
+    public ChangePasswordResponseDTO changePassword(Authentication authentication, String authHeader, ChangePasswordRequestDTO request) {
+        String email = null;
+        if (authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getName())) {
+            email = authentication.getName();
+        } else if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7).trim();
+            if (tokenBlacklistService == null || !tokenBlacklistService.isBlacklisted(token)) {
+                try {
+                    email = jwtService.extractEmail(token);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        return changePassword(email, request);
+    }
+
+    @Transactional
+    public ChangePasswordResponseDTO changePassword(String email, ChangePasswordRequestDTO request) {
+        if (email == null || email.isBlank() || "anonymousUser".equals(email)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Acceso no autorizado: se requiere autenticación válida");
+        }
+
+        UsuarioEntity usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
+
+        if (!Boolean.TRUE.equals(usuario.getActivo())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "La cuenta de usuario no está activa");
+        }
+
+        // 1. Validar que la contraseña actual coincida (Criterio de Aceptación 1)
+        if (!passwordEncoder.matches(request.getPasswordActual(), usuario.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña actual no coincide");
+        }
+
+        // 2. Validar que la nueva contraseña y la confirmación coincidan
+        if (!request.getNuevaPassword().equals(request.getConfirmarPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La confirmación de la contraseña no coincide");
+        }
+
+        // 3. Validar políticas de complejidad (mínimo 8 caracteres, números, mayúsculas)
+        if (!PASSWORD_COMPLEXITY_PATTERN.matcher(request.getNuevaPassword()).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La nueva contraseña debe tener al menos 8 caracteres, incluir al menos una letra mayúscula y un número");
+        }
+
+        // 4. Actualizar contraseña hasheada con BCrypt (Criterio de Aceptación 2)
+        usuario.setPasswordHash(passwordEncoder.encode(request.getNuevaPassword()));
+        usuarioRepository.save(usuario);
+
+        // 5. Revocar refresh tokens activos previos por seguridad
+        if (refreshTokenService != null) {
+            refreshTokenService.revokeAllUserTokens(usuario);
+        }
+
+        log.info("Contraseña actualizada exitosamente para el usuario [{}] mediante cambio de contraseña", email);
+        return new ChangePasswordResponseDTO("Contraseña actualizada exitosamente");
     }
 
     private boolean isBcryptHash(String hash) {

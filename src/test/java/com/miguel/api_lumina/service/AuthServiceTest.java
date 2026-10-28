@@ -1,6 +1,8 @@
 package com.miguel.api_lumina.service;
 
 import com.miguel.api_lumina.dto.AuthResponseDTO;
+import com.miguel.api_lumina.dto.ChangePasswordRequestDTO;
+import com.miguel.api_lumina.dto.ChangePasswordResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
@@ -439,5 +441,108 @@ public class AuthServiceTest {
         assertEquals("La cuenta de usuario no está activa", ex.getReason());
 
         verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+    }
+
+    // --- Pruebas de B-17: Cambio de contraseña por usuario autenticado ---
+
+    @Test
+    @DisplayName("changePassword actualiza la contraseña con hash BCrypt y revoca tokens de sesión anteriores")
+    public void testChangePassword_Success() {
+        String email = "doctor@lumina.com";
+        String claveActual = "ClaveVieja123!";
+        String nuevaClave = "NuevaClaveSegura2026!";
+
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(20L);
+        usuario.setEmail(email);
+        usuario.setPasswordHash(passwordEncoder.encode(claveActual));
+        usuario.setActivo(true);
+
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(usuario));
+
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO(claveActual, nuevaClave, nuevaClave);
+        ChangePasswordResponseDTO response = authService.changePassword(email, request);
+
+        assertNotNull(response);
+        assertEquals("Contraseña actualizada exitosamente", response.getMensaje());
+
+        // Comprobar que se guardó la nueva contraseña hasheada con BCrypt
+        ArgumentCaptor<UsuarioEntity> captor = ArgumentCaptor.forClass(UsuarioEntity.class);
+        verify(usuarioRepository).save(captor.capture());
+        UsuarioEntity usuarioGuardado = captor.getValue();
+
+        assertTrue(passwordEncoder.matches(nuevaClave, usuarioGuardado.getPasswordHash()));
+        assertTrue(usuarioGuardado.getPasswordHash().startsWith("$2a$"));
+        verify(refreshTokenService).revokeAllUserTokens(usuario);
+    }
+
+    @Test
+    @DisplayName("changePassword falla con 400 Bad Request si la contraseña actual no coincide (Criterio 1)")
+    public void testChangePassword_WrongCurrentPassword() {
+        String email = "doctor@lumina.com";
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail(email);
+        usuario.setPasswordHash(passwordEncoder.encode("ClaveCorrecta123!"));
+        usuario.setActivo(true);
+
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(usuario));
+
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO("ClaveErronea!", "NuevaClave2026!", "NuevaClave2026!");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.changePassword(email, request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("La contraseña actual no coincide", ex.getReason());
+
+        verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+    }
+
+    @Test
+    @DisplayName("changePassword falla con 400 Bad Request si la confirmación no coincide")
+    public void testChangePassword_ConfirmationMismatch() {
+        String email = "doctor@lumina.com";
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail(email);
+        usuario.setPasswordHash(passwordEncoder.encode("ClaveActual123!"));
+        usuario.setActivo(true);
+
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(usuario));
+
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO("ClaveActual123!", "NuevaClave2026!", "OtraClaveDiferente!");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.changePassword(email, request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertEquals("La confirmación de la contraseña no coincide", ex.getReason());
+
+        verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+    }
+
+    @Test
+    @DisplayName("changePassword falla con 400 Bad Request si la nueva contraseña no cumple políticas de complejidad")
+    public void testChangePassword_WeakComplexity() {
+        String email = "doctor@lumina.com";
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail(email);
+        usuario.setPasswordHash(passwordEncoder.encode("ClaveActual123!"));
+        usuario.setActivo(true);
+
+        when(usuarioRepository.findByEmail(email)).thenReturn(Optional.of(usuario));
+
+        // Sin mayúsculas ni números
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO("ClaveActual123!", "solominusculas", "solominusculas");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.changePassword(email, request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("al menos 8 caracteres"));
+
+        verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+    }
+
+    @Test
+    @DisplayName("changePassword falla con 401 Unauthorized si el usuario no está autenticado")
+    public void testChangePassword_Unauthenticated() {
+        ChangePasswordRequestDTO request = new ChangePasswordRequestDTO("ClaveActual123!", "NuevaClave2026!", "NuevaClave2026!");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.changePassword("", request));
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
     }
 }
