@@ -2,6 +2,8 @@ package com.miguel.api_lumina.controller;
 
 import com.miguel.api_lumina.dto.CancelarTurnoDTO;
 import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
+import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
+import com.miguel.api_lumina.dto.TurnoRecurrenteResponseDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
 import com.miguel.api_lumina.service.TurnoService;
@@ -30,6 +32,22 @@ public class TurnoController {
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @PostMapping("/recurrentes")
+    public ResponseEntity<?> generarTurnosRecurrentes(@Valid @RequestBody TurnoRecurrenteRequestDTO dto) {
+        try {
+            TurnoRecurrenteResponseDTO response = turnoService.generarTurnosRecurrentes(dto);
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @GetMapping("/recurrencia/{idRecurrencia}")
+    public ResponseEntity<List<TurnoResponseDTO>> obtenerTurnosPorRecurrencia(@PathVariable String idRecurrencia) {
+        List<TurnoResponseDTO> turnos = turnoService.obtenerTurnosPorRecurrencia(idRecurrencia);
+        return ResponseEntity.ok(turnos);
     }
 
     @GetMapping("/{id}")

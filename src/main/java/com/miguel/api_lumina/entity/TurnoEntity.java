@@ -46,6 +46,9 @@ public class TurnoEntity {
     @Column(name = "estado")
     private String estado;
 
+    @Column(name = "id_recurrencia", length = 36)
+    private String idRecurrencia;
+
     @Column(name = "motivo_cancelacion")
     private String motivoCancelacion;
 
@@ -116,6 +119,14 @@ public class TurnoEntity {
 
     public void setEstado(String estado) {
         this.estado = estado;
+    }
+
+    public String getIdRecurrencia() {
+        return idRecurrencia;
+    }
+
+    public void setIdRecurrencia(String idRecurrencia) {
+        this.idRecurrencia = idRecurrencia;
     }
 
     public String getMotivoCancelacion() {

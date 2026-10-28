@@ -11,8 +11,22 @@ import java.util.List;
 
 @Repository
 public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
+
     List<TurnoEntity> findByCuidador_IdUsuario(Long idCuidador);
+
     List<TurnoEntity> findByPaciente_IdPaciente(Long idPaciente);
+
+    List<TurnoEntity> findByIdRecurrencia(String idRecurrencia);
+
+    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t WHERE t.cuidador.idUsuario = :idCuidador AND t.estado != 'CANCELADO' AND t.fechaHoraInicio < :fin AND t.fechaHoraFin > :inicio")
+    boolean existeSolapamientoCuidador(@Param("idCuidador") Long idCuidador,
+                                      @Param("inicio") LocalDateTime inicio,
+                                      @Param("fin") LocalDateTime fin);
+
+    @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t WHERE t.paciente.idPaciente = :idPaciente AND t.estado != 'CANCELADO' AND t.fechaHoraInicio < :fin AND t.fechaHoraFin > :inicio")
+    boolean existeSolapamientoPaciente(@Param("idPaciente") Long idPaciente,
+                                      @Param("inicio") LocalDateTime inicio,
+                                      @Param("fin") LocalDateTime fin);
 
     @Query("SELECT COUNT(t) > 0 FROM TurnoEntity t " +
            "WHERE t.idTurno != :idTurno " +
