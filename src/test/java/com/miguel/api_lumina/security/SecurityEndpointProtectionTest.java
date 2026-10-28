@@ -33,6 +33,9 @@ public class SecurityEndpointProtectionTest {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private TokenBlacklistService tokenBlacklistService;
+
     @MockitoBean
     private UsuarioRepository usuarioRepository;
 
@@ -125,5 +128,30 @@ public class SecurityEndpointProtectionTest {
                         .content("{\"token\":\"token-cualquiera\",\"nuevaPassword\":\"clave123\"}"))
                 // No debe arrojar 401 de filtro de seguridad (fallará por validación/token inexistente 400, pero no 401)
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Petición a endpoint público (POST /api/auth/logout) es accesible sin token")
+    public void testPublicLogoutEndpoint_AccessibleWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensaje").value("Sesión cerrada exitosamente"));
+    }
+
+    @Test
+    @DisplayName("Petición a endpoint protegido con token revocado en lista negra retorna 401 Unauthorized")
+    public void testProtectedEndpointWithBlacklistedToken_Returns401() throws Exception {
+        String email = "revocado@lumina.com";
+        String token = jwtService.generateToken(email, 99L, "MEDICO");
+
+        // Agregar el token a la lista negra
+        tokenBlacklistService.blacklistToken(token);
+
+        mockMvc.perform(get("/api/usuarios/1")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Acceso no autorizado: se requiere autenticación válida"));
     }
 }

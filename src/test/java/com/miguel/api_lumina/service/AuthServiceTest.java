@@ -4,6 +4,8 @@ import com.miguel.api_lumina.dto.AuthResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
+import com.miguel.api_lumina.dto.LogoutRequestDTO;
+import com.miguel.api_lumina.dto.LogoutResponseDTO;
 import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
@@ -13,6 +15,7 @@ import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.repository.PasswordResetTokenRepository;
 import com.miguel.api_lumina.repository.UsuarioRepository;
 import com.miguel.api_lumina.security.JwtService;
+import com.miguel.api_lumina.security.TokenBlacklistService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,13 +52,16 @@ public class AuthServiceTest {
     @Mock
     private PasswordResetTokenRepository passwordResetTokenRepository;
 
+    @Mock
+    private TokenBlacklistService tokenBlacklistService;
+
     private PasswordEncoder passwordEncoder;
     private AuthService authService;
 
     @BeforeEach
     public void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        authService = new AuthService(usuarioRepository, passwordEncoder, jwtService, refreshTokenService, passwordResetTokenRepository);
+        authService = new AuthService(usuarioRepository, passwordEncoder, jwtService, refreshTokenService, passwordResetTokenRepository, tokenBlacklistService);
     }
 
     @Test
@@ -192,6 +198,48 @@ public class AuthServiceTest {
         assertEquals("jwt-nuevo", actualResponse.getToken());
         assertEquals("refresh-nuevo", actualResponse.getRefreshToken());
         verify(refreshTokenService).refreshAccessToken(request);
+    }
+
+    // --- Pruebas de B-15: Logout y Revocación de Tokens ---
+
+    @Test
+    @DisplayName("logout agrega access token a lista negra y revoca refresh tokens")
+    public void testLogout_Success_WithTokenAndRefresh() {
+        String authHeader = "Bearer mi.jwt.activo";
+        LogoutRequestDTO request = new LogoutRequestDTO("refresh-token-123");
+
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail("medico@lumina.com");
+
+        when(jwtService.extractEmail("mi.jwt.activo")).thenReturn("medico@lumina.com");
+        when(usuarioRepository.findByEmail("medico@lumina.com")).thenReturn(Optional.of(usuario));
+
+        LogoutResponseDTO response = authService.logout(authHeader, request);
+
+        assertNotNull(response);
+        assertEquals("Sesión cerrada exitosamente", response.getMensaje());
+
+        // Comprobar que el access token se agregó a la lista negra
+        verify(tokenBlacklistService).blacklistToken("mi.jwt.activo");
+
+        // Comprobar que se revocó el refresh token específico
+        verify(refreshTokenService).revokeRefreshToken("refresh-token-123");
+
+        // Comprobar que se revocaron todos los refresh tokens activos del usuario
+        verify(refreshTokenService).revokeAllUserTokens(usuario);
+    }
+
+    @Test
+    @DisplayName("logout funciona correctamente cuando solo se envía el refresh token en el cuerpo")
+    public void testLogout_OnlyRefreshToken() {
+        LogoutRequestDTO request = new LogoutRequestDTO("solo-refresh-456");
+
+        LogoutResponseDTO response = authService.logout(null, request);
+
+        assertNotNull(response);
+        assertEquals("Sesión cerrada exitosamente", response.getMensaje());
+        verify(tokenBlacklistService, never()).blacklistToken(anyString());
+        verify(refreshTokenService).revokeRefreshToken("solo-refresh-456");
     }
 
     // --- Pruebas de B-16: Recuperación y reseteo de contraseña por token ---

@@ -5,6 +5,8 @@ import com.miguel.api_lumina.dto.AuthResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
+import com.miguel.api_lumina.dto.LogoutRequestDTO;
+import com.miguel.api_lumina.dto.LogoutResponseDTO;
 import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
@@ -255,5 +257,21 @@ public class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.refreshToken").exists());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/logout retorna 200 y mensaje de confirmación")
+    public void testLogout_Success() throws Exception {
+        LogoutRequestDTO request = new LogoutRequestDTO("refresh-token-valido");
+        LogoutResponseDTO response = new LogoutResponseDTO("Sesión cerrada exitosamente");
+
+        when(authService.logout(any(), any())).thenReturn(response);
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer jwt.token.valido")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensaje").value("Sesión cerrada exitosamente"));
     }
 }

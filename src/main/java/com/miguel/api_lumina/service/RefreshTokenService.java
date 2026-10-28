@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -94,6 +95,31 @@ public class RefreshTokenService {
         log.info("Refresh token rotado exitosamente para el usuario [{}]. Nuevo refresh token: {}", usuario.getEmail(), newUUID);
 
         return new AuthResponseDTO(newAccessToken, "Bearer", usuario.getEmail(), usuario.getRol(), savedNewRefreshToken.getToken());
+    }
+
+    @Transactional
+    public void revokeRefreshToken(String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        refreshTokenRepository.findByToken(token.trim()).ifPresent(entity -> {
+            entity.setRevocado(true);
+            refreshTokenRepository.save(entity);
+            log.info("Refresh token [{}] revocado explícitamente en BD", token);
+        });
+    }
+
+    @Transactional
+    public void revokeAllUserTokens(UsuarioEntity usuario) {
+        if (usuario == null) {
+            return;
+        }
+        List<RefreshTokenEntity> activeTokens = refreshTokenRepository.findByUsuarioAndRevocadoFalse(usuario);
+        for (RefreshTokenEntity entity : activeTokens) {
+            entity.setRevocado(true);
+        }
+        refreshTokenRepository.saveAll(activeTokens);
+        log.info("Todos los refresh tokens activos del usuario [{}] han sido revocados", usuario.getEmail());
     }
 
     @Transactional(readOnly = true)

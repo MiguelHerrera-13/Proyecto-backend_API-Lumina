@@ -4,6 +4,8 @@ import com.miguel.api_lumina.dto.AuthResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
+import com.miguel.api_lumina.dto.LogoutRequestDTO;
+import com.miguel.api_lumina.dto.LogoutResponseDTO;
 import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
@@ -13,6 +15,7 @@ import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.repository.PasswordResetTokenRepository;
 import com.miguel.api_lumina.repository.UsuarioRepository;
 import com.miguel.api_lumina.security.JwtService;
+import com.miguel.api_lumina.security.TokenBlacklistService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,26 +42,35 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Value("${auth.reset-token.expiration-minutes:15}")
     private long tokenExpirationMinutes = 15;
 
     public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
-        this(usuarioRepository, passwordEncoder, jwtService, null, null);
+        this(usuarioRepository, passwordEncoder, jwtService, null, null, null);
     }
 
     public AuthService(UsuarioRepository usuarioRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        RefreshTokenService refreshTokenService) {
-        this(usuarioRepository, passwordEncoder, jwtService, refreshTokenService, null);
+        this(usuarioRepository, passwordEncoder, jwtService, refreshTokenService, null, null);
     }
 
     public AuthService(UsuarioRepository usuarioRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        PasswordResetTokenRepository passwordResetTokenRepository) {
-        this(usuarioRepository, passwordEncoder, jwtService, null, passwordResetTokenRepository);
+        this(usuarioRepository, passwordEncoder, jwtService, null, passwordResetTokenRepository, null);
+    }
+
+    public AuthService(UsuarioRepository usuarioRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService,
+                       RefreshTokenService refreshTokenService,
+                       PasswordResetTokenRepository passwordResetTokenRepository) {
+        this(usuarioRepository, passwordEncoder, jwtService, refreshTokenService, passwordResetTokenRepository, null);
     }
 
     @Autowired
@@ -66,12 +78,14 @@ public class AuthService {
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        RefreshTokenService refreshTokenService,
-                       PasswordResetTokenRepository passwordResetTokenRepository) {
+                       PasswordResetTokenRepository passwordResetTokenRepository,
+                       TokenBlacklistService tokenBlacklistService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     public void setTokenExpirationMinutes(long tokenExpirationMinutes) {
@@ -123,6 +137,39 @@ public class AuthService {
             throw new IllegalStateException("RefreshTokenService no está configurado");
         }
         return refreshTokenService.refreshAccessToken(request);
+    }
+
+    @Transactional
+    public LogoutResponseDTO logout(String authHeader, LogoutRequestDTO request) {
+        String accessToken = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            accessToken = authHeader.substring(7).trim();
+        }
+
+        // 1. Invalidar access token en la lista negra en memoria
+        if (accessToken != null && !accessToken.isBlank() && tokenBlacklistService != null) {
+            tokenBlacklistService.blacklistToken(accessToken);
+        }
+
+        // 2. Revocar refresh token explícito si se proporcionó en el cuerpo
+        String refreshToken = request != null ? request.getRefreshToken() : null;
+        if (refreshToken != null && !refreshToken.isBlank() && refreshTokenService != null) {
+            refreshTokenService.revokeRefreshToken(refreshToken.trim());
+        }
+
+        // 3. Si se dispone del access token, también revocar todos los refresh tokens activos del usuario en BD
+        if (accessToken != null && !accessToken.isBlank() && refreshTokenService != null) {
+            try {
+                String email = jwtService.extractEmail(accessToken);
+                if (email != null && !email.isBlank()) {
+                    usuarioRepository.findByEmail(email).ifPresent(refreshTokenService::revokeAllUserTokens);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        log.info("Cierre de sesión (logout) ejecutado exitosamente");
+        return new LogoutResponseDTO("Sesión cerrada exitosamente");
     }
 
     @Transactional
