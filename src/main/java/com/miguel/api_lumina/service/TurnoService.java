@@ -3,6 +3,7 @@ package com.miguel.api_lumina.service;
 import com.miguel.api_lumina.dto.CancelarTurnoDTO;
 import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoConflictoDTO;
+import com.miguel.api_lumina.dto.TurnoFiltroDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteRequestDTO;
 import com.miguel.api_lumina.dto.TurnoRecurrenteResponseDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
@@ -13,7 +14,11 @@ import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.repository.PacienteRepository;
 import com.miguel.api_lumina.repository.TurnoRepository;
 import com.miguel.api_lumina.repository.UsuarioRepository;
+import com.miguel.api_lumina.specification.TurnoSpecification;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -220,7 +225,7 @@ public class TurnoService {
         }
 
         if (!dto.getNuevaFechaHoraInicio().isBefore(dto.getNuevaFechaHoraFin())) {
-            throw new IllegalArgumentException("La fecha de inicio debe ser anterior a la de fin");
+            throw new IllegalArgumentException("La nueva fecha de inicio debe ser anterior a la de fin");
         }
 
         if (dto.getMotivo() == null || dto.getMotivo().trim().length() < 10) {
@@ -232,35 +237,36 @@ public class TurnoService {
 
         validarTurnoModificable(turno, "reprogramar");
 
-        // Criterio de Aceptación: Validar disponibilidad horaria nuevamente
+        // Validar disponibilidad horaria de médico si tiene médico asignado
         if (turno.getMedico() != null) {
-            boolean hayConflictoMedico = turnoRepository.existsSuperposicionMedico(
+            boolean solapaMedico = turnoRepository.existsSuperposicionMedico(
                     idTurno,
                     turno.getMedico().getIdUsuario(),
                     dto.getNuevaFechaHoraInicio(),
                     dto.getNuevaFechaHoraFin()
             );
-            if (hayConflictoMedico) {
+            if (solapaMedico) {
                 throw new IllegalStateException("El médico ya tiene un turno asignado en el horario seleccionado");
             }
         }
 
+        // Validar disponibilidad horaria de cuidador
         if (turno.getCuidador() != null) {
-            boolean hayConflictoCuidador = turnoRepository.existsSuperposicionCuidador(
+            boolean solapaCuidador = turnoRepository.existsSuperposicionCuidador(
                     idTurno,
                     turno.getCuidador().getIdUsuario(),
                     dto.getNuevaFechaHoraInicio(),
                     dto.getNuevaFechaHoraFin()
             );
-            if (hayConflictoCuidador) {
+            if (solapaCuidador) {
                 throw new IllegalStateException("El cuidador ya tiene un turno asignado en el horario seleccionado");
             }
         }
 
         turno.setFechaHoraInicio(dto.getNuevaFechaHoraInicio());
         turno.setFechaHoraFin(dto.getNuevaFechaHoraFin());
-        turno.setEstado("REPROGRAMADO");
         turno.setMotivoReprogramacion(dto.getMotivo().trim());
+        turno.setEstado("REPROGRAMADO");
 
         TurnoEntity actualizado = turnoRepository.save(turno);
         return mapToDTO(actualizado);
@@ -293,12 +299,51 @@ public class TurnoService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public Page<TurnoResponseDTO> buscarTurnos(
+            Long pacienteId,
+            Long profesionalId,
+            Long medicoId,
+            Long cuidadorId,
+            String estado,
+            LocalDateTime fechaDesde,
+            LocalDateTime fechaHasta,
+            Pageable pageable
+    ) {
+        Specification<TurnoEntity> spec = TurnoSpecification.conFiltros(
+                pacienteId, profesionalId, medicoId, cuidadorId, estado, fechaDesde, fechaHasta
+        );
+        Page<TurnoEntity> turnosPage = turnoRepository.findAll(spec, pageable);
+        return turnosPage.map(this::mapToDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TurnoResponseDTO> buscarTurnos(TurnoFiltroDTO filtro, Pageable pageable) {
+        if (filtro == null) {
+            filtro = new TurnoFiltroDTO();
+        }
+        return buscarTurnos(
+                filtro.getPacienteId(),
+                filtro.getProfesionalId(),
+                filtro.getMedicoId(),
+                filtro.getCuidadorId(),
+                filtro.getEstado(),
+                filtro.getFechaDesde(),
+                filtro.getFechaHasta(),
+                pageable
+        );
+    }
+
     private TurnoResponseDTO mapToDTO(TurnoEntity turno) {
         TurnoResponseDTO dto = new TurnoResponseDTO();
 
         dto.setIdTurno(turno.getIdTurno());
-        dto.setNombrePaciente(turno.getPaciente().getNombreCompleto());
-        dto.setNombreCuidador(turno.getCuidador().getNombre());
+        if (turno.getPaciente() != null) {
+            dto.setNombrePaciente(turno.getPaciente().getNombreCompleto());
+        }
+        if (turno.getCuidador() != null) {
+            dto.setNombreCuidador(turno.getCuidador().getNombre());
+        }
 
         if (turno.getMedico() != null) {
             dto.setIdMedico(turno.getMedico().getIdUsuario());
