@@ -20,4 +20,5 @@ jwt.expiration=86400000
 # Configuración recuperación de contraseña (duración en minutos: 15 a 30 min)
 auth.reset-token.expiration-minutes=15
 
-
+# Tiempo de expiración del Refresh Token (en días)
+jwt.refresh-expiration-days=7

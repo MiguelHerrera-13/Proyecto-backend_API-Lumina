@@ -97,6 +97,17 @@ public class SecurityEndpointProtectionTest {
     }
 
     @Test
+    @DisplayName("Petición a endpoint público (POST /api/auth/refresh) es accesible sin token")
+    public void testPublicRefreshTokenEndpoint_AccessibleWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"token-prueba-123\"}"))
+                // No debe arrojar 401 de filtro de seguridad de endpoint protegido (fallará por negocio 401 token inexistente, pero pasa el filtro de seguridad)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Refresh token inexistente o inválido"));
+    }
+
+    @Test
     @DisplayName("Petición a endpoint público (POST /api/auth/forgot-password) es accesible sin token")
     public void testPublicForgotPasswordEndpoint_AccessibleWithoutToken() throws Exception {
         mockMvc.perform(post("/api/auth/forgot-password")
@@ -116,4 +127,3 @@ public class SecurityEndpointProtectionTest {
                 .andExpect(status().isBadRequest());
     }
 }
-

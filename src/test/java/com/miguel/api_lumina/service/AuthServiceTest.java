@@ -4,9 +4,11 @@ import com.miguel.api_lumina.dto.AuthResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
+import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
 import com.miguel.api_lumina.entity.PasswordResetTokenEntity;
+import com.miguel.api_lumina.entity.RefreshTokenEntity;
 import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.repository.PasswordResetTokenRepository;
 import com.miguel.api_lumina.repository.UsuarioRepository;
@@ -25,7 +27,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +44,9 @@ public class AuthServiceTest {
     private JwtService jwtService;
 
     @Mock
+    private RefreshTokenService refreshTokenService;
+
+    @Mock
     private PasswordResetTokenRepository passwordResetTokenRepository;
 
     private PasswordEncoder passwordEncoder;
@@ -51,11 +55,11 @@ public class AuthServiceTest {
     @BeforeEach
     public void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        authService = new AuthService(usuarioRepository, passwordEncoder, jwtService, passwordResetTokenRepository);
+        authService = new AuthService(usuarioRepository, passwordEncoder, jwtService, refreshTokenService, passwordResetTokenRepository);
     }
 
     @Test
-    @DisplayName("Login exitoso con contraseña almacenada en formato BCrypt")
+    @DisplayName("Login exitoso con contraseña BCrypt retorna token JWT y refresh token")
     public void testLogin_Success_BcryptPassword() {
         String rawPassword = "passwordSegura123";
         String hashedPassword = passwordEncoder.encode(rawPassword);
@@ -67,8 +71,11 @@ public class AuthServiceTest {
         usuario.setRol("MEDICO");
         usuario.setActivo(true);
 
+        RefreshTokenEntity refreshTokenEntity = new RefreshTokenEntity("refresh-token-uuid-1", usuario, LocalDateTime.now().plusDays(7));
+
         when(usuarioRepository.findByEmail("doctor@test.com")).thenReturn(Optional.of(usuario));
         when(jwtService.generateToken("doctor@test.com", 1L, "MEDICO")).thenReturn("fake.jwt.token");
+        when(refreshTokenService.createRefreshToken(usuario)).thenReturn(refreshTokenEntity);
 
         LoginRequestDTO request = new LoginRequestDTO("doctor@test.com", rawPassword);
         AuthResponseDTO response = authService.login(request);
@@ -78,9 +85,10 @@ public class AuthServiceTest {
         assertEquals("Bearer", response.getTipo());
         assertEquals("doctor@test.com", response.getEmail());
         assertEquals("MEDICO", response.getRol());
+        assertEquals("refresh-token-uuid-1", response.getRefreshToken());
 
-        // No debe intentar guardar si ya era BCrypt
         verify(usuarioRepository, never()).save(any(UsuarioEntity.class));
+        verify(refreshTokenService).createRefreshToken(usuario);
     }
 
     @Test
@@ -95,14 +103,18 @@ public class AuthServiceTest {
         usuario.setRol("CUIDADOR");
         usuario.setActivo(true);
 
+        RefreshTokenEntity refreshTokenEntity = new RefreshTokenEntity("refresh-token-uuid-2", usuario, LocalDateTime.now().plusDays(7));
+
         when(usuarioRepository.findByEmail("legacy@test.com")).thenReturn(Optional.of(usuario));
         when(jwtService.generateToken("legacy@test.com", 2L, "CUIDADOR")).thenReturn("fake.jwt.migrated");
+        when(refreshTokenService.createRefreshToken(usuario)).thenReturn(refreshTokenEntity);
 
         LoginRequestDTO request = new LoginRequestDTO("legacy@test.com", legacyPassword);
         AuthResponseDTO response = authService.login(request);
 
         assertNotNull(response);
         assertEquals("fake.jwt.migrated", response.getToken());
+        assertEquals("refresh-token-uuid-2", response.getRefreshToken());
 
         // Comprobar que se guardó la entidad con la contraseña migrada a BCrypt
         ArgumentCaptor<UsuarioEntity> captor = ArgumentCaptor.forClass(UsuarioEntity.class);
@@ -132,6 +144,7 @@ public class AuthServiceTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(request));
         verify(jwtService, never()).generateToken(any(), any(), any());
+        verify(refreshTokenService, never()).createRefreshToken(any());
     }
 
     @Test
@@ -143,6 +156,7 @@ public class AuthServiceTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(request));
         verify(jwtService, never()).generateToken(any(), any(), any());
+        verify(refreshTokenService, never()).createRefreshToken(any());
     }
 
     @Test
@@ -161,6 +175,23 @@ public class AuthServiceTest {
 
         assertThrows(BadCredentialsException.class, () -> authService.login(request));
         verify(jwtService, never()).generateToken(any(), any(), any());
+        verify(refreshTokenService, never()).createRefreshToken(any());
+    }
+
+    @Test
+    @DisplayName("refreshToken delega correctamente a RefreshTokenService")
+    public void testRefreshToken_DelegatesToService() {
+        RefreshTokenRequestDTO request = new RefreshTokenRequestDTO("token-123");
+        AuthResponseDTO expectedResponse = new AuthResponseDTO("jwt-nuevo", "Bearer", "test@test.com", "ADMIN", "refresh-nuevo");
+
+        when(refreshTokenService.refreshAccessToken(request)).thenReturn(expectedResponse);
+
+        AuthResponseDTO actualResponse = authService.refreshToken(request);
+
+        assertNotNull(actualResponse);
+        assertEquals("jwt-nuevo", actualResponse.getToken());
+        assertEquals("refresh-nuevo", actualResponse.getRefreshToken());
+        verify(refreshTokenService).refreshAccessToken(request);
     }
 
     // --- Pruebas de B-16: Recuperación y reseteo de contraseña por token ---

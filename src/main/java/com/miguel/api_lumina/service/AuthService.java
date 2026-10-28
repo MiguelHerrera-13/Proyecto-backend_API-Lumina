@@ -4,9 +4,11 @@ import com.miguel.api_lumina.dto.AuthResponseDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ForgotPasswordResponseDTO;
 import com.miguel.api_lumina.dto.LoginRequestDTO;
+import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
 import com.miguel.api_lumina.entity.PasswordResetTokenEntity;
+import com.miguel.api_lumina.entity.RefreshTokenEntity;
 import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.repository.PasswordResetTokenRepository;
 import com.miguel.api_lumina.repository.UsuarioRepository;
@@ -35,23 +37,40 @@ public class AuthService {
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Value("${auth.reset-token.expiration-minutes:15}")
     private long tokenExpirationMinutes = 15;
 
     public AuthService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
-        this(usuarioRepository, passwordEncoder, jwtService, null);
+        this(usuarioRepository, passwordEncoder, jwtService, null, null);
+    }
+
+    public AuthService(UsuarioRepository usuarioRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService,
+                       RefreshTokenService refreshTokenService) {
+        this(usuarioRepository, passwordEncoder, jwtService, refreshTokenService, null);
+    }
+
+    public AuthService(UsuarioRepository usuarioRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService,
+                       PasswordResetTokenRepository passwordResetTokenRepository) {
+        this(usuarioRepository, passwordEncoder, jwtService, null, passwordResetTokenRepository);
     }
 
     @Autowired
     public AuthService(UsuarioRepository usuarioRepository,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
+                       RefreshTokenService refreshTokenService,
                        PasswordResetTokenRepository passwordResetTokenRepository) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
@@ -88,7 +107,22 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(usuario.getEmail(), usuario.getIdUsuario(), usuario.getRol());
-        return new AuthResponseDTO(token, "Bearer", usuario.getEmail(), usuario.getRol());
+        String refreshTokenStr = null;
+
+        if (refreshTokenService != null) {
+            RefreshTokenEntity refreshToken = refreshTokenService.createRefreshToken(usuario);
+            refreshTokenStr = refreshToken.getToken();
+        }
+
+        return new AuthResponseDTO(token, "Bearer", usuario.getEmail(), usuario.getRol(), refreshTokenStr);
+    }
+
+    @Transactional
+    public AuthResponseDTO refreshToken(RefreshTokenRequestDTO request) {
+        if (refreshTokenService == null) {
+            throw new IllegalStateException("RefreshTokenService no está configurado");
+        }
+        return refreshTokenService.refreshAccessToken(request);
     }
 
     @Transactional
