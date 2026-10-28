@@ -12,6 +12,8 @@ public class TurnoResponseDTO {
     private LocalDateTime fechaHoraInicio;
     private LocalDateTime fechaHoraFin;
     private String estado;
+    private String motivoCancelacion;
+    private String motivoReprogramacion;
 
     public TurnoResponseDTO() {
     }
@@ -78,5 +80,21 @@ public class TurnoResponseDTO {
 
     public void setEstado(String estado) {
         this.estado = estado;
+    }
+
+    public String getMotivoCancelacion() {
+        return motivoCancelacion;
+    }
+
+    public void setMotivoCancelacion(String motivoCancelacion) {
+        this.motivoCancelacion = motivoCancelacion;
+    }
+
+    public String getMotivoReprogramacion() {
+        return motivoReprogramacion;
+    }
+
+    public void setMotivoReprogramacion(String motivoReprogramacion) {
+        this.motivoReprogramacion = motivoReprogramacion;
     }
 }

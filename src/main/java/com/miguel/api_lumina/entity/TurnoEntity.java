@@ -46,6 +46,12 @@ public class TurnoEntity {
     @Column(name = "estado")
     private String estado;
 
+    @Column(name = "motivo_cancelacion")
+    private String motivoCancelacion;
+
+    @Column(name = "motivo_reprogramacion")
+    private String motivoReprogramacion;
+
     @Version
     @Column(name = "version")
     private Integer version;
@@ -112,6 +118,22 @@ public class TurnoEntity {
         this.estado = estado;
     }
 
+    public String getMotivoCancelacion() {
+        return motivoCancelacion;
+    }
+
+    public void setMotivoCancelacion(String motivoCancelacion) {
+        this.motivoCancelacion = motivoCancelacion;
+    }
+
+    public String getMotivoReprogramacion() {
+        return motivoReprogramacion;
+    }
+
+    public void setMotivoReprogramacion(String motivoReprogramacion) {
+        this.motivoReprogramacion = motivoReprogramacion;
+    }
+
     public Integer getVersion() {
         return version;
     }
@@ -127,5 +149,4 @@ public class TurnoEntity {
     public void setActivo(Boolean activo) {
         this.activo = activo;
     }
-
 }

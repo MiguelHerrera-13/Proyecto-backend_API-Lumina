@@ -1,8 +1,11 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.CancelarTurnoDTO;
+import com.miguel.api_lumina.dto.ReprogramarTurnoDTO;
 import com.miguel.api_lumina.dto.TurnoRequestDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
 import com.miguel.api_lumina.service.TurnoService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +23,7 @@ public class TurnoController {
     }
 
     @PostMapping
-    public ResponseEntity<?> crearTurno(@RequestBody TurnoRequestDTO dto) {
+    public ResponseEntity<?> crearTurno(@Valid @RequestBody TurnoRequestDTO dto) {
         try {
             TurnoResponseDTO response = turnoService.crearTurno(dto);
             return new ResponseEntity<>(response, HttpStatus.CREATED);
@@ -43,5 +46,35 @@ public class TurnoController {
     public ResponseEntity<List<TurnoResponseDTO>> obtenerTurnosPorCuidador(@PathVariable Long idCuidador) {
         List<TurnoResponseDTO> turnos = turnoService.obtenerTurnosPorCuidador(idCuidador);
         return ResponseEntity.ok(turnos);
+    }
+
+    @PostMapping("/{id}/cancelar")
+    public ResponseEntity<?> cancelarTurno(
+            @PathVariable Long id,
+            @Valid @RequestBody CancelarTurnoDTO dto
+    ) {
+        try {
+            TurnoResponseDTO response = turnoService.cancelarTurno(id, dto);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.CONFLICT);
+        }
+    }
+
+    @PostMapping("/{id}/reprogramar")
+    public ResponseEntity<?> reprogramarTurno(
+            @PathVariable Long id,
+            @Valid @RequestBody ReprogramarTurnoDTO dto
+    ) {
+        try {
+            TurnoResponseDTO response = turnoService.reprogramarTurno(id, dto);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.CONFLICT);
+        }
     }
 }
