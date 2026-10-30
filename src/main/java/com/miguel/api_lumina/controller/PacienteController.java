@@ -1,5 +1,7 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.HistorialDTO;
+import com.miguel.api_lumina.dto.PacienteInactivoResponseDTO;
 import com.miguel.api_lumina.dto.PacienteRequestDTO;
 import com.miguel.api_lumina.dto.PacienteResponseDTO;
 import com.miguel.api_lumina.entity.PacienteEntity;
@@ -7,9 +9,11 @@ import com.miguel.api_lumina.service.PacienteService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import com.miguel.api_lumina.dto.HistorialDTO;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -21,16 +25,32 @@ public class PacienteController {
     public PacienteController(PacienteService pacienteService) {
         this.pacienteService = pacienteService;
     }
+
+    @GetMapping("/inactivos")
+    public ResponseEntity<List<PacienteInactivoResponseDTO>> obtenerPacientesInactivos(
+            Authentication authentication) {
+        validarRolAdmin(authentication);
+        List<PacienteInactivoResponseDTO> inactivos = pacienteService.obtenerPacientesInactivos();
+        return ResponseEntity.ok(inactivos);
+    }
+
+    @PatchMapping("/{id}/reactivar")
+    public ResponseEntity<PacienteResponseDTO> reactivarPaciente(
+            @PathVariable("id") Long id,
+            Authentication authentication) {
+        validarRolAdmin(authentication);
+        PacienteResponseDTO responseDTO = pacienteService.reactivarPaciente(id);
+        return ResponseEntity.ok(responseDTO);
+    }
+
     @GetMapping("/{id}/historial")
-    public ResponseEntity<HistorialDTO> obtenerHistorial(@PathVariable Long id) {
-
+    public ResponseEntity<HistorialDTO> obtenerHistorial(@PathVariable("id") Long id) {
         HistorialDTO historial = pacienteService.obtenerHistorial(id);
-
         return ResponseEntity.ok(historial);
     }
+
     @PostMapping
     public ResponseEntity<PacienteResponseDTO> crearPaciente(@Valid @RequestBody PacienteRequestDTO requestDTO) {
-        // Mapeo manual RequestDTO -> Entity
         PacienteEntity entity = new PacienteEntity();
         entity.setNombreCompleto(requestDTO.getNombreCompleto());
         entity.setFechaNacimiento(requestDTO.getFechaNacimiento());
@@ -38,7 +58,6 @@ public class PacienteController {
         
         PacienteEntity pacienteGuardado = pacienteService.registrarPaciente(entity);
         
-        // Mapeo manual Entity -> ResponseDTO
         PacienteResponseDTO responseDTO = new PacienteResponseDTO(
                 pacienteGuardado.getIdPaciente(),
                 pacienteGuardado.getNombreCompleto(),
@@ -51,12 +70,11 @@ public class PacienteController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PacienteResponseDTO> obtenerPaciente(@PathVariable Long id) {
+    public ResponseEntity<PacienteResponseDTO> obtenerPaciente(@PathVariable("id") Long id) {
         Optional<PacienteEntity> pacienteOpt = pacienteService.obtenerPacientePorId(id);
         
         if (pacienteOpt.isPresent()) {
             PacienteEntity entity = pacienteOpt.get();
-            // Mapeo manual Entity -> ResponseDTO
             PacienteResponseDTO responseDTO = new PacienteResponseDTO(
                     entity.getIdPaciente(),
                     entity.getNombreCompleto(),
@@ -71,8 +89,25 @@ public class PacienteController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarPaciente(@PathVariable Long id) {
-        pacienteService.darDeBajaPaciente(id);
+    public ResponseEntity<Void> eliminarPaciente(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "motivo", required = false) String motivo,
+            Authentication authentication) {
+        String usuario = (authentication != null) ? authentication.getName() : null;
+        pacienteService.darDeBajaPaciente(id, motivo, usuario);
         return ResponseEntity.noContent().build();
+    }
+
+    private void validarRolAdmin(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Acceso no autorizado");
+        }
+
+        boolean esAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ADMIN"));
+
+        if (!esAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo usuarios con rol ADMIN pueden reactivar pacientes");
+        }
     }
 }

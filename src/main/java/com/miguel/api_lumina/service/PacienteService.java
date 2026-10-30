@@ -1,6 +1,7 @@
 package com.miguel.api_lumina.service;
 
 import com.miguel.api_lumina.dto.HistorialDTO;
+import com.miguel.api_lumina.dto.PacienteInactivoResponseDTO;
 import com.miguel.api_lumina.dto.PacienteResponseDTO;
 import com.miguel.api_lumina.dto.TratamientoResponseDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
@@ -56,7 +57,53 @@ public class PacienteService {
 
     @Transactional
     public void darDeBajaPaciente(Long id) {
-        pacienteRepository.findById(id).ifPresent(pacienteRepository::delete);
+        darDeBajaPaciente(id, "Baja administrativa", null);
+    }
+
+    @Transactional
+    public void darDeBajaPaciente(Long id, String motivo, String usuario) {
+        PacienteEntity paciente = pacienteRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El paciente con ID " + id + " no existe"));
+
+        String motivoFinal = (motivo != null && !motivo.isBlank()) ? motivo.trim() : "Baja administrativa";
+        String usuarioFinal = (usuario != null && !usuario.isBlank()) ? usuario.trim() : "ADMIN";
+
+        pacienteRepository.darDeBajaConAuditoria(id, motivoFinal, LocalDateTime.now(), usuarioFinal);
+    }
+
+    @Transactional
+    public PacienteResponseDTO reactivarPaciente(Long id) {
+        PacienteEntity paciente = pacienteRepository.findByIdAnyStatus(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El paciente con ID " + id + " no existe"));
+
+        if (Boolean.TRUE.equals(paciente.getActivo())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El paciente con ID " + id + " ya se encuentra activo");
+        }
+
+        pacienteRepository.reactivarPacienteById(id);
+        paciente.setActivo(true);
+        paciente.setMotivoBaja(null);
+        paciente.setFechaBaja(null);
+        paciente.setUsuarioBaja(null);
+
+        return mapearPaciente(paciente);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PacienteInactivoResponseDTO> obtenerPacientesInactivos() {
+        return pacienteRepository.findPacientesInactivos()
+                .stream()
+                .map(p -> new PacienteInactivoResponseDTO(
+                        p.getIdPaciente(),
+                        p.getNombreCompleto(),
+                        p.getFechaNacimiento(),
+                        p.getDiagnosticoFase(),
+                        p.getActivo(),
+                        p.getMotivoBaja(),
+                        p.getFechaBaja(),
+                        p.getUsuarioBaja()
+                ))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -124,7 +171,10 @@ public class PacienteService {
                 paciente.getNombreCompleto(),
                 paciente.getFechaNacimiento(),
                 paciente.getDiagnosticoFase(),
-                paciente.getActivo()
+                paciente.getActivo(),
+                paciente.getMotivoBaja(),
+                paciente.getFechaBaja(),
+                paciente.getUsuarioBaja()
         );
     }
 
