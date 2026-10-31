@@ -11,10 +11,12 @@ import com.miguel.api_lumina.dto.LogoutResponseDTO;
 import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
+import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import com.miguel.api_lumina.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -72,6 +74,12 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<ResetPasswordResponseDTO> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO request) {
         ResetPasswordResponseDTO response = authService.resetPassword(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> getUsuarioActual(Authentication authentication) {
+        UsuarioResponseDTO response = authService.obtenerUsuarioActual(authentication);
         return ResponseEntity.ok(response);
     }
 }

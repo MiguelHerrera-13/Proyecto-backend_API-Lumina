@@ -12,6 +12,7 @@ import com.miguel.api_lumina.dto.LogoutResponseDTO;
 import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
+import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import com.miguel.api_lumina.exception.GlobalExceptionHandler;
 import com.miguel.api_lumina.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -322,5 +324,37 @@ public class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.nuevaPassword").exists());
+    }
+
+    @Test
+    @DisplayName("GET /api/auth/me retorna 200 OK con datos del usuario actual")
+    public void testGetUsuarioActual_Success() throws Exception {
+        UsuarioResponseDTO usuarioDto = new UsuarioResponseDTO();
+        usuarioDto.setIdUsuario(1L);
+        usuarioDto.setNombre("Nicolas Penna");
+        usuarioDto.setEmail("nico@lumina.com");
+        usuarioDto.setRol("MEDICO");
+        usuarioDto.setActivo(true);
+
+        when(authService.obtenerUsuarioActual(any())).thenReturn(usuarioDto);
+
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idUsuario").value(1L))
+                .andExpect(jsonPath("$.nombre").value("Nicolas Penna"))
+                .andExpect(jsonPath("$.email").value("nico@lumina.com"))
+                .andExpect(jsonPath("$.rol").value("MEDICO"))
+                .andExpect(jsonPath("$.activo").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /api/auth/me sin autenticacion retorna 401 Unauthorized")
+    public void testGetUsuarioActual_Unauthorized() throws Exception {
+        when(authService.obtenerUsuarioActual(any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Acceso no autorizado: se requiere autenticación válida"));
+
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Acceso no autorizado: se requiere autenticación válida"));
     }
 }

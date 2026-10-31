@@ -11,6 +11,7 @@ import com.miguel.api_lumina.dto.LogoutResponseDTO;
 import com.miguel.api_lumina.dto.RefreshTokenRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordRequestDTO;
 import com.miguel.api_lumina.dto.ResetPasswordResponseDTO;
+import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import com.miguel.api_lumina.entity.PasswordResetTokenEntity;
 import com.miguel.api_lumina.entity.RefreshTokenEntity;
 import com.miguel.api_lumina.entity.UsuarioEntity;
@@ -27,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -580,5 +582,61 @@ public class AuthServiceTest {
         assertThrows(BadCredentialsException.class, () -> authService.login(request));
 
         verify(mockLoginAttemptService, times(1)).registrarIntentoFallido(usuario);
+    }
+
+    @Test
+    @DisplayName("obtenerUsuarioActual con usuario autenticado retorna UsuarioResponseDTO exitosamente")
+    public void testObtenerUsuarioActual_Success() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setIdUsuario(10L);
+        usuario.setNombre("Nicolas Penna");
+        usuario.setEmail("nico@lumina.com");
+        usuario.setRol("MEDICO");
+        usuario.setActivo(true);
+
+        when(usuarioRepository.findByEmail("nico@lumina.com")).thenReturn(Optional.of(usuario));
+
+        Authentication auth = mock(Authentication.class);
+        when(auth.isAuthenticated()).thenReturn(true);
+        when(auth.getName()).thenReturn("nico@lumina.com");
+
+        UsuarioResponseDTO response = authService.obtenerUsuarioActual(auth);
+
+        assertNotNull(response);
+        assertEquals(10L, response.getIdUsuario());
+        assertEquals("Nicolas Penna", response.getNombre());
+        assertEquals("nico@lumina.com", response.getEmail());
+        assertEquals("MEDICO", response.getRol());
+        assertTrue(response.getActivo());
+    }
+
+    @Test
+    @DisplayName("obtenerUsuarioActual sin autenticacion lanza 401 Unauthorized")
+    public void testObtenerUsuarioActual_SinAutenticacion_Lanza401() {
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> authService.obtenerUsuarioActual((Authentication) null));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Acceso no autorizado"));
+    }
+
+    @Test
+    @DisplayName("obtenerUsuarioActual con usuario inactivo lanza 401 Unauthorized")
+    public void testObtenerUsuarioActual_UsuarioInactivo_Lanza401() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail("inactivo@lumina.com");
+        usuario.setActivo(false);
+
+        when(usuarioRepository.findByEmail("inactivo@lumina.com")).thenReturn(Optional.of(usuario));
+
+        Authentication auth = mock(Authentication.class);
+        when(auth.isAuthenticated()).thenReturn(true);
+        when(auth.getName()).thenReturn("inactivo@lumina.com");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> authService.obtenerUsuarioActual(auth));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("no está activa"));
     }
 }
