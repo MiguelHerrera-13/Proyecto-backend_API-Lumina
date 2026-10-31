@@ -10,6 +10,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "paciente")
@@ -34,7 +35,24 @@ public class PacienteEntity {
     @Column(name = "activo")
     private Boolean activo = true;
 
+    @Column(name = "motivo_baja", length = 255)
+    private String motivoBaja;
+
+    @Column(name = "fecha_baja")
+    private LocalDateTime fechaBaja;
+
+    @Column(name = "usuario_baja", length = 100)
+    private String usuarioBaja;
+
     public PacienteEntity() {
+    }
+
+    public PacienteEntity(Long idPaciente, String nombreCompleto, LocalDate fechaNacimiento, String diagnosticoFase, Boolean activo) {
+        this.idPaciente = idPaciente;
+        this.nombreCompleto = nombreCompleto;
+        this.fechaNacimiento = fechaNacimiento;
+        this.diagnosticoFase = diagnosticoFase;
+        this.activo = activo;
     }
 
     public Long getIdPaciente() {
@@ -75,5 +93,29 @@ public class PacienteEntity {
 
     public void setActivo(Boolean activo) {
         this.activo = activo;
+    }
+
+    public String getMotivoBaja() {
+        return motivoBaja;
+    }
+
+    public void setMotivoBaja(String motivoBaja) {
+        this.motivoBaja = motivoBaja;
+    }
+
+    public LocalDateTime getFechaBaja() {
+        return fechaBaja;
+    }
+
+    public void setFechaBaja(LocalDateTime fechaBaja) {
+        this.fechaBaja = fechaBaja;
+    }
+
+    public String getUsuarioBaja() {
+        return usuarioBaja;
+    }
+
+    public void setUsuarioBaja(String usuarioBaja) {
+        this.usuarioBaja = usuarioBaja;
     }
 }

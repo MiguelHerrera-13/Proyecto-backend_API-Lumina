@@ -1,6 +1,8 @@
 package com.miguel.api_lumina.service;
 
 import com.miguel.api_lumina.dto.HistorialDTO;
+import com.miguel.api_lumina.dto.PacienteInactivoResponseDTO;
+import com.miguel.api_lumina.dto.PacienteResponseDTO;
 import com.miguel.api_lumina.entity.PacienteEntity;
 import com.miguel.api_lumina.entity.TratamientoEntity;
 import com.miguel.api_lumina.entity.TurnoEntity;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -50,7 +53,6 @@ class PacienteServiceTest {
 
     @BeforeEach
     void setUp() {
-
         paciente = new PacienteEntity();
         paciente.setIdPaciente(1L);
         paciente.setNombreCompleto("Paciente Test");
@@ -74,19 +76,93 @@ class PacienteServiceTest {
     }
 
     @Test
+    @DisplayName("Debe reactivar un paciente inactivo exitosamente")
+    void reactivarPaciente_Exitoso() {
+        PacienteEntity inactivo = new PacienteEntity();
+        inactivo.setIdPaciente(1L);
+        inactivo.setNombreCompleto("Paciente Inactivo");
+        inactivo.setActivo(false);
+        inactivo.setMotivoBaja("Traslado temporal");
+        inactivo.setFechaBaja(LocalDateTime.now().minusDays(5));
+        inactivo.setUsuarioBaja("admin@lumina.com");
+
+        when(pacienteRepository.findByIdAnyStatus(1L)).thenReturn(Optional.of(inactivo));
+
+        PacienteResponseDTO response = pacienteService.reactivarPaciente(1L);
+
+        assertNotNull(response);
+        assertTrue(response.getActivo());
+        assertNull(response.getMotivoBaja());
+        verify(pacienteRepository).reactivarPacienteById(1L);
+    }
+
+    @Test
+    @DisplayName("Reactivar paciente inexistente lanza 404 NOT_FOUND")
+    void reactivarPaciente_Inexistente_Lanza404() {
+        when(pacienteRepository.findByIdAnyStatus(99L)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                pacienteService.reactivarPaciente(99L)
+        );
+
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
+        verify(pacienteRepository, never()).reactivarPacienteById(anyLong());
+    }
+
+    @Test
+    @DisplayName("Reactivar paciente que ya está activo lanza 400 BAD_REQUEST")
+    void reactivarPaciente_YaActivo_Lanza400() {
+        when(pacienteRepository.findByIdAnyStatus(1L)).thenReturn(Optional.of(paciente));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () ->
+                pacienteService.reactivarPaciente(1L)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
+        verify(pacienteRepository, never()).reactivarPacienteById(anyLong());
+    }
+
+    @Test
+    @DisplayName("Obtener pacientes inactivos retorna lista con campos de auditoría")
+    void obtenerPacientesInactivos_RetornaLista() {
+        PacienteEntity inactivo = new PacienteEntity();
+        inactivo.setIdPaciente(5L);
+        inactivo.setNombreCompleto("Carlos Baja");
+        inactivo.setActivo(false);
+        inactivo.setMotivoBaja("Fallecimiento");
+        inactivo.setFechaBaja(LocalDateTime.now());
+        inactivo.setUsuarioBaja("admin@lumina.com");
+
+        when(pacienteRepository.findPacientesInactivos()).thenReturn(List.of(inactivo));
+
+        List<PacienteInactivoResponseDTO> lista = pacienteService.obtenerPacientesInactivos();
+
+        assertNotNull(lista);
+        assertEquals(1, lista.size());
+        assertEquals("Carlos Baja", lista.get(0).getNombreCompleto());
+        assertEquals("Fallecimiento", lista.get(0).getMotivoBaja());
+        assertEquals("admin@lumina.com", lista.get(0).getUsuarioBaja());
+    }
+
+    @Test
+    @DisplayName("Dar de baja paciente guarda campos de auditoría")
+    void darDeBajaPaciente_ConAuditoria() {
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+
+        pacienteService.darDeBajaPaciente(1L, "Cambio de residencia", "admin@lumina.com");
+
+        verify(pacienteRepository).darDeBajaConAuditoria(eq(1L), eq("Cambio de residencia"), any(LocalDateTime.class), eq("admin@lumina.com"));
+    }
+
+    @Test
     @DisplayName("Debe obtener el historial completo de un paciente")
     void obtenerHistorial_exitoso() {
-
         TurnoEntity turno = new TurnoEntity();
         turno.setIdTurno(10L);
         turno.setPaciente(paciente);
         turno.setCuidador(cuidador);
-        turno.setFechaHoraInicio(
-                LocalDateTime.now().minusDays(2)
-        );
-        turno.setFechaHoraFin(
-                LocalDateTime.now().minusDays(2).plusHours(1)
-        );
+        turno.setFechaHoraInicio(LocalDateTime.now().minusDays(2));
+        turno.setFechaHoraFin(LocalDateTime.now().minusDays(2).plusHours(1));
         turno.setEstado("FINALIZADO");
 
         TratamientoEntity tratamiento = new TratamientoEntity();
@@ -98,75 +174,37 @@ class PacienteServiceTest {
         tratamiento.setFechaFin(LocalDate.now().plusDays(10));
         tratamiento.setActivo(true);
 
-        when(pacienteRepository.findById(1L))
-                .thenReturn(Optional.of(paciente));
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(turnoRepository.findByPaciente_IdPaciente(1L)).thenReturn(List.of(turno));
+        when(tratamientoRepository.findByPaciente_IdPaciente(1L)).thenReturn(List.of(tratamiento));
+        when(usuarioRepository.findAllById(any())).thenReturn(List.of(cuidador, medico));
 
-        when(turnoRepository.findByPaciente_IdPaciente(1L))
-                .thenReturn(List.of(turno));
-
-        when(tratamientoRepository.findByPaciente_IdPaciente(1L))
-                .thenReturn(List.of(tratamiento));
-
-        when(usuarioRepository.findAllById(any()))
-                .thenReturn(List.of(cuidador, medico));
-
-        HistorialDTO resultado =
-                pacienteService.obtenerHistorial(1L);
+        HistorialDTO resultado = pacienteService.obtenerHistorial(1L);
 
         assertNotNull(resultado);
-
         assertNotNull(resultado.getPaciente());
-        assertEquals(
-                "Paciente Test",
-                resultado.getPaciente().getNombreCompleto()
-        );
-
+        assertEquals("Paciente Test", resultado.getPaciente().getNombreCompleto());
         assertEquals(1, resultado.getTurnos().size());
-        assertEquals(
-                10L,
-                resultado.getTurnos().get(0).getIdTurno()
-        );
-
+        assertEquals(10L, resultado.getTurnos().get(0).getIdTurno());
         assertEquals(1, resultado.getTratamientos().size());
-        assertEquals(
-                20L,
-                resultado.getTratamientos().get(0).getIdTratamiento()
-        );
-
+        assertEquals(20L, resultado.getTratamientos().get(0).getIdTratamiento());
         assertEquals(2, resultado.getUsuariosRelacionados().size());
 
-        verify(pacienteRepository, times(1))
-                .findById(1L);
-
-        verify(turnoRepository, times(1))
-                .findByPaciente_IdPaciente(1L);
-
-        verify(tratamientoRepository, times(1))
-                .findByPaciente_IdPaciente(1L);
-
-        verify(usuarioRepository, times(1))
-                .findAllById(any());
+        verify(pacienteRepository, times(1)).findById(1L);
+        verify(turnoRepository, times(1)).findByPaciente_IdPaciente(1L);
+        verify(tratamientoRepository, times(1)).findByPaciente_IdPaciente(1L);
+        verify(usuarioRepository, times(1)).findAllById(any());
     }
 
     @Test
     @DisplayName("Debe fallar si el paciente no existe")
     void obtenerHistorial_pacienteInexistente() {
+        when(pacienteRepository.findById(99L)).thenReturn(Optional.empty());
 
-        when(pacienteRepository.findById(99L))
-                .thenReturn(Optional.empty());
+        assertThrows(ResponseStatusException.class, () -> pacienteService.obtenerHistorial(99L));
 
-        assertThrows(
-                ResponseStatusException.class,
-                () -> pacienteService.obtenerHistorial(99L)
-        );
-
-        verify(turnoRepository, never())
-                .findByPaciente_IdPaciente(anyLong());
-
-        verify(tratamientoRepository, never())
-                .findByPaciente_IdPaciente(anyLong());
-
-        verify(usuarioRepository, never())
-                .findAllById(any());
+        verify(turnoRepository, never()).findByPaciente_IdPaciente(anyLong());
+        verify(tratamientoRepository, never()).findByPaciente_IdPaciente(anyLong());
+        verify(usuarioRepository, never()).findAllById(any());
     }
 }
