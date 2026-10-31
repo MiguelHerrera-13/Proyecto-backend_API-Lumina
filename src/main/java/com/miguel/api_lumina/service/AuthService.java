@@ -48,6 +48,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final TokenBlacklistService tokenBlacklistService;
+    private LoginAttemptService loginAttemptService;
 
     @Value("${auth.reset-token.expiration-minutes:15}")
     private long tokenExpirationMinutes = 15;
@@ -93,9 +94,16 @@ public class AuthService {
         this.tokenBlacklistService = tokenBlacklistService;
     }
 
+    @Autowired(required = false)
+    public void setLoginAttemptService(LoginAttemptService loginAttemptService) {
+        this.loginAttemptService = loginAttemptService;
+    }
+
     public void setTokenExpirationMinutes(long tokenExpirationMinutes) {
         this.tokenExpirationMinutes = tokenExpirationMinutes;
     }
+
+    private static final int MAX_INTENTOS = 5;
 
     @Transactional
     public AuthResponseDTO login(LoginRequestDTO request) {
@@ -104,6 +112,19 @@ public class AuthService {
 
         if (!Boolean.TRUE.equals(usuario.getActivo())) {
             throw new BadCredentialsException("Credenciales inválidas");
+        }
+
+        // B-18: Verificar si la cuenta está bloqueada temporalmente
+        if (usuario.getBloqueadoHasta() != null) {
+            if (usuario.getBloqueadoHasta().isAfter(LocalDateTime.now())) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Cuenta bloqueada temporalmente. Intente nuevamente más tarde.");
+            } else {
+                // Desbloqueo automático una vez transcurridos los 15 minutos
+                if (loginAttemptService != null) {
+                    loginAttemptService.resetearIntentos(usuario);
+                }
+            }
         }
 
         String storedHash = usuario.getPasswordHash();
@@ -122,7 +143,20 @@ public class AuthService {
         }
 
         if (!passwordMatches) {
+            // B-18: Guardar intento fallido en transacción independiente (REQUIRES_NEW)
+            if (loginAttemptService != null) {
+                loginAttemptService.registrarIntentoFallido(usuario);
+            }
+            if (usuario.getBloqueadoHasta() != null && usuario.getBloqueadoHasta().isAfter(LocalDateTime.now())) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Cuenta bloqueada temporalmente. Intente nuevamente más tarde.");
+            }
             throw new BadCredentialsException("Credenciales inválidas");
+        }
+
+        // B-18: Login exitoso — resetear contador en transacción independiente
+        if (loginAttemptService != null) {
+            loginAttemptService.resetearIntentos(usuario);
         }
 
         String token = jwtService.generateToken(usuario.getEmail(), usuario.getIdUsuario(), usuario.getRol());
@@ -135,6 +169,7 @@ public class AuthService {
 
         return new AuthResponseDTO(token, "Bearer", usuario.getEmail(), usuario.getRol(), refreshTokenStr);
     }
+
 
     @Transactional
     public AuthResponseDTO refreshToken(RefreshTokenRequestDTO request) {
