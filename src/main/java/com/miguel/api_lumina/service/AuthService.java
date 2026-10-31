@@ -24,7 +24,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
+import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -343,5 +345,37 @@ public class AuthService {
             return false;
         }
         return hash.startsWith("$2a$") || hash.startsWith("$2b$") || hash.startsWith("$2y$");
+    }
+
+    @Transactional(readOnly = true)
+    public UsuarioResponseDTO obtenerUsuarioActual() {
+        return obtenerUsuarioActual(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Transactional(readOnly = true)
+    public UsuarioResponseDTO obtenerUsuarioActual(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+            authentication = SecurityContextHolder.getContext().getAuthentication();
+        }
+
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Acceso no autorizado: se requiere autenticación válida");
+        }
+
+        String email = authentication.getName();
+        UsuarioEntity usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
+
+        if (!Boolean.TRUE.equals(usuario.getActivo())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "La cuenta de usuario no está activa");
+        }
+
+        UsuarioResponseDTO dto = new UsuarioResponseDTO();
+        dto.setIdUsuario(usuario.getIdUsuario());
+        dto.setNombre(usuario.getNombre());
+        dto.setEmail(usuario.getEmail());
+        dto.setRol(usuario.getRol());
+        dto.setActivo(usuario.getActivo());
+        return dto;
     }
 }
