@@ -9,6 +9,8 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "usuario")
 @SQLDelete(sql = "UPDATE usuario SET activo = false WHERE id_usuario=?")
@@ -34,6 +36,12 @@ public class UsuarioEntity {
 
     @Column(name = "activo")
     private Boolean activo = true;
+
+    @Column(name = "intentos_fallidos")
+    private Integer intentosFallidos = 0;
+
+    @Column(name = "bloqueado_hasta")
+    private LocalDateTime bloqueadoHasta;
 
     public UsuarioEntity() {
     }
@@ -84,5 +92,21 @@ public class UsuarioEntity {
 
     public void setActivo(Boolean activo) {
         this.activo = activo;
+    }
+
+    public Integer getIntentosFallidos() {
+        return intentosFallidos == null ? 0 : intentosFallidos;
+    }
+
+    public void setIntentosFallidos(Integer intentosFallidos) {
+        this.intentosFallidos = intentosFallidos;
+    }
+
+    public LocalDateTime getBloqueadoHasta() {
+        return bloqueadoHasta;
+    }
+
+    public void setBloqueadoHasta(LocalDateTime bloqueadoHasta) {
+        this.bloqueadoHasta = bloqueadoHasta;
     }
 }

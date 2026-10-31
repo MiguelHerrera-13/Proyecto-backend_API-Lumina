@@ -545,4 +545,40 @@ public class AuthServiceTest {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.changePassword("", request));
         assertEquals(HttpStatus.UNAUTHORIZED, ex.getStatusCode());
     }
+
+    @Test
+    @DisplayName("Login con cuenta bloqueada temporalmente lanza 429 Too Many Requests")
+    public void testLogin_Bloqueada_Lanza429() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail("bloqueado@test.com");
+        usuario.setActivo(true);
+        usuario.setBloqueadoHasta(LocalDateTime.now().plusMinutes(10));
+
+        when(usuarioRepository.findByEmail("bloqueado@test.com")).thenReturn(Optional.of(usuario));
+
+        LoginRequestDTO request = new LoginRequestDTO("bloqueado@test.com", "Password123!");
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> authService.login(request));
+
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Cuenta bloqueada temporalmente"));
+    }
+
+    @Test
+    @DisplayName("Login fallido llama a registrarIntentoFallido en LoginAttemptService")
+    public void testLogin_PasswordIncorrecto_RegistraIntentoFallido() {
+        UsuarioEntity usuario = new UsuarioEntity();
+        usuario.setEmail("doctor@test.com");
+        usuario.setPasswordHash(passwordEncoder.encode("PasswordCorrecta123!"));
+        usuario.setActivo(true);
+
+        LoginAttemptService mockLoginAttemptService = mock(LoginAttemptService.class);
+        authService.setLoginAttemptService(mockLoginAttemptService);
+
+        when(usuarioRepository.findByEmail("doctor@test.com")).thenReturn(Optional.of(usuario));
+
+        LoginRequestDTO request = new LoginRequestDTO("doctor@test.com", "PasswordINCORRECTA");
+        assertThrows(BadCredentialsException.class, () -> authService.login(request));
+
+        verify(mockLoginAttemptService, times(1)).registrarIntentoFallido(usuario);
+    }
 }
