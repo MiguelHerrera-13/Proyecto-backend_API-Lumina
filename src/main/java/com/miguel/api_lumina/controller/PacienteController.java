@@ -1,5 +1,7 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.AsignacionProfesionalRequestDTO;
+import com.miguel.api_lumina.dto.AsignacionProfesionalResponseDTO;
 import com.miguel.api_lumina.dto.HistorialDTO;
 import com.miguel.api_lumina.dto.PacienteInactivoResponseDTO;
 import com.miguel.api_lumina.dto.PacienteRequestDTO;
@@ -55,9 +57,9 @@ public class PacienteController {
         entity.setNombreCompleto(requestDTO.getNombreCompleto());
         entity.setFechaNacimiento(requestDTO.getFechaNacimiento());
         entity.setDiagnosticoFase(requestDTO.getDiagnosticoFase());
-        
+
         PacienteEntity pacienteGuardado = pacienteService.registrarPaciente(entity);
-        
+
         PacienteResponseDTO responseDTO = new PacienteResponseDTO(
                 pacienteGuardado.getIdPaciente(),
                 pacienteGuardado.getNombreCompleto(),
@@ -65,14 +67,14 @@ public class PacienteController {
                 pacienteGuardado.getDiagnosticoFase(),
                 pacienteGuardado.getActivo()
         );
-        
+
         return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PacienteResponseDTO> obtenerPaciente(@PathVariable("id") Long id) {
         Optional<PacienteEntity> pacienteOpt = pacienteService.obtenerPacientePorId(id);
-        
+
         if (pacienteOpt.isPresent()) {
             PacienteEntity entity = pacienteOpt.get();
             PacienteResponseDTO responseDTO = new PacienteResponseDTO(
@@ -96,6 +98,34 @@ public class PacienteController {
         String usuario = (authentication != null) ? authentication.getName() : null;
         pacienteService.darDeBajaPaciente(id, motivo, usuario);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/medico-cabecera")
+    public ResponseEntity<AsignacionProfesionalResponseDTO> asignarMedicoCabecera(
+            @PathVariable("id") Long idPaciente,
+            @Valid @RequestBody AsignacionProfesionalRequestDTO requestDTO) {
+        try {
+            AsignacionProfesionalResponseDTO response =
+                    pacienteService.asignarMedicoCabecera(idPaciente, requestDTO.getIdUsuario());
+
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/cuidadores")
+    public ResponseEntity<AsignacionProfesionalResponseDTO> agregarCuidador(
+            @PathVariable("id") Long idPaciente,
+            @Valid @RequestBody AsignacionProfesionalRequestDTO requestDTO) {
+        try {
+            AsignacionProfesionalResponseDTO response =
+                    pacienteService.agregarCuidador(idPaciente, requestDTO.getIdUsuario());
+
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
     }
 
     private void validarRolAdmin(Authentication authentication) {
