@@ -1,15 +1,19 @@
 package com.miguel.api_lumina.service;
 
+import com.miguel.api_lumina.dto.AsignacionProfesionalResponseDTO;
 import com.miguel.api_lumina.dto.HistorialDTO;
 import com.miguel.api_lumina.dto.PacienteInactivoResponseDTO;
 import com.miguel.api_lumina.dto.PacienteResponseDTO;
 import com.miguel.api_lumina.dto.TratamientoResponseDTO;
 import com.miguel.api_lumina.dto.TurnoResponseDTO;
 import com.miguel.api_lumina.dto.UsuarioResponseDTO;
+import com.miguel.api_lumina.entity.AsignacionProfesionalPacienteEntity;
 import com.miguel.api_lumina.entity.PacienteEntity;
+import com.miguel.api_lumina.entity.TipoAsignacionProfesional;
 import com.miguel.api_lumina.entity.TratamientoEntity;
 import com.miguel.api_lumina.entity.TurnoEntity;
 import com.miguel.api_lumina.entity.UsuarioEntity;
+import com.miguel.api_lumina.repository.AsignacionProfesionalPacienteRepository;
 import com.miguel.api_lumina.repository.PacienteRepository;
 import com.miguel.api_lumina.repository.TratamientoRepository;
 import com.miguel.api_lumina.repository.TurnoRepository;
@@ -33,17 +37,20 @@ public class PacienteService {
     private final TurnoRepository turnoRepository;
     private final TratamientoRepository tratamientoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final AsignacionProfesionalPacienteRepository asignacionProfesionalPacienteRepository;
 
     public PacienteService(
             PacienteRepository pacienteRepository,
             TurnoRepository turnoRepository,
             TratamientoRepository tratamientoRepository,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            AsignacionProfesionalPacienteRepository asignacionProfesionalPacienteRepository) {
 
         this.pacienteRepository = pacienteRepository;
         this.turnoRepository = turnoRepository;
         this.tratamientoRepository = tratamientoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.asignacionProfesionalPacienteRepository = asignacionProfesionalPacienteRepository;
     }
 
     @Transactional
@@ -161,6 +168,112 @@ public class PacienteService {
                 usuariosDTO,
                 turnosDTO,
                 tratamientosDTO
+        );
+    }
+
+    @Transactional
+    public AsignacionProfesionalResponseDTO asignarMedicoCabecera(
+            Long idPaciente,
+            Long idUsuario) {
+
+        PacienteEntity paciente = pacienteRepository.findById(idPaciente)
+                .orElseThrow(() -> new IllegalArgumentException("El paciente no existe"));
+
+        UsuarioEntity medico = usuarioRepository.findById(idUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("El usuario no existe"));
+
+        if (medico.getRol() == null || !"MEDICO".equals(medico.getRol())) {
+            throw new IllegalArgumentException("El usuario indicado no tiene rol MEDICO");
+        }
+
+        Optional<AsignacionProfesionalPacienteEntity> asignacionActual =
+                asignacionProfesionalPacienteRepository
+                        .findFirstByPaciente_IdPacienteAndTipoAsignacionAndActivaTrue(
+                                idPaciente,
+                                TipoAsignacionProfesional.MEDICO_CABECERA
+                        );
+
+        if (asignacionActual.isPresent()) {
+            AsignacionProfesionalPacienteEntity actual = asignacionActual.get();
+
+            if (actual.getUsuario().getIdUsuario().equals(idUsuario)) {
+                return mapearAsignacion(actual);
+            }
+
+            actual.setActiva(false);
+            actual.setFechaHasta(LocalDateTime.now());
+            asignacionProfesionalPacienteRepository.save(actual);
+        }
+
+        AsignacionProfesionalPacienteEntity nuevaAsignacion =
+                new AsignacionProfesionalPacienteEntity();
+
+        nuevaAsignacion.setPaciente(paciente);
+        nuevaAsignacion.setUsuario(medico);
+        nuevaAsignacion.setTipoAsignacion(TipoAsignacionProfesional.MEDICO_CABECERA);
+        nuevaAsignacion.setFechaDesde(LocalDateTime.now());
+        nuevaAsignacion.setActiva(true);
+
+        AsignacionProfesionalPacienteEntity guardada =
+                asignacionProfesionalPacienteRepository.save(nuevaAsignacion);
+
+        return mapearAsignacion(guardada);
+    }
+
+    @Transactional
+    public AsignacionProfesionalResponseDTO agregarCuidador(
+            Long idPaciente,
+            Long idUsuario) {
+
+        PacienteEntity paciente = pacienteRepository.findById(idPaciente)
+                .orElseThrow(() -> new IllegalArgumentException("El paciente no existe"));
+
+        UsuarioEntity cuidador = usuarioRepository.findById(idUsuario)
+                .orElseThrow(() -> new IllegalArgumentException("El usuario no existe"));
+
+        if (cuidador.getRol() == null || !"CUIDADOR".equals(cuidador.getRol())) {
+            throw new IllegalArgumentException("El usuario indicado no tiene rol CUIDADOR");
+        }
+
+        boolean yaAsignado =
+                asignacionProfesionalPacienteRepository
+                        .existsByPaciente_IdPacienteAndUsuario_IdUsuarioAndTipoAsignacionAndActivaTrue(
+                                idPaciente,
+                                idUsuario,
+                                TipoAsignacionProfesional.CUIDADOR
+                        );
+
+        if (yaAsignado) {
+            throw new IllegalArgumentException("El cuidador ya se encuentra asignado al paciente");
+        }
+
+        AsignacionProfesionalPacienteEntity nuevaAsignacion =
+                new AsignacionProfesionalPacienteEntity();
+
+        nuevaAsignacion.setPaciente(paciente);
+        nuevaAsignacion.setUsuario(cuidador);
+        nuevaAsignacion.setTipoAsignacion(TipoAsignacionProfesional.CUIDADOR);
+        nuevaAsignacion.setFechaDesde(LocalDateTime.now());
+        nuevaAsignacion.setActiva(true);
+
+        AsignacionProfesionalPacienteEntity guardada =
+                asignacionProfesionalPacienteRepository.save(nuevaAsignacion);
+
+        return mapearAsignacion(guardada);
+    }
+
+    private AsignacionProfesionalResponseDTO mapearAsignacion(
+            AsignacionProfesionalPacienteEntity asignacion) {
+
+        return new AsignacionProfesionalResponseDTO(
+                asignacion.getIdAsignacion(),
+                asignacion.getPaciente().getIdPaciente(),
+                asignacion.getUsuario().getIdUsuario(),
+                asignacion.getUsuario().getNombre(),
+                asignacion.getTipoAsignacion(),
+                asignacion.getFechaDesde(),
+                asignacion.getFechaHasta(),
+                asignacion.getActiva()
         );
     }
 

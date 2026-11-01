@@ -1,12 +1,16 @@
 package com.miguel.api_lumina.service;
 
+import com.miguel.api_lumina.dto.AsignacionProfesionalResponseDTO;
 import com.miguel.api_lumina.dto.HistorialDTO;
 import com.miguel.api_lumina.dto.PacienteInactivoResponseDTO;
 import com.miguel.api_lumina.dto.PacienteResponseDTO;
+import com.miguel.api_lumina.entity.AsignacionProfesionalPacienteEntity;
 import com.miguel.api_lumina.entity.PacienteEntity;
+import com.miguel.api_lumina.entity.TipoAsignacionProfesional;
 import com.miguel.api_lumina.entity.TratamientoEntity;
 import com.miguel.api_lumina.entity.TurnoEntity;
 import com.miguel.api_lumina.entity.UsuarioEntity;
+import com.miguel.api_lumina.repository.AsignacionProfesionalPacienteRepository;
 import com.miguel.api_lumina.repository.PacienteRepository;
 import com.miguel.api_lumina.repository.TratamientoRepository;
 import com.miguel.api_lumina.repository.TurnoRepository;
@@ -43,6 +47,9 @@ class PacienteServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private AsignacionProfesionalPacienteRepository asignacionProfesionalPacienteRepository;
 
     @InjectMocks
     private PacienteService pacienteService;
@@ -151,7 +158,12 @@ class PacienteServiceTest {
 
         pacienteService.darDeBajaPaciente(1L, "Cambio de residencia", "admin@lumina.com");
 
-        verify(pacienteRepository).darDeBajaConAuditoria(eq(1L), eq("Cambio de residencia"), any(LocalDateTime.class), eq("admin@lumina.com"));
+        verify(pacienteRepository).darDeBajaConAuditoria(
+                eq(1L),
+                eq("Cambio de residencia"),
+                any(LocalDateTime.class),
+                eq("admin@lumina.com")
+        );
     }
 
     @Test
@@ -206,5 +218,225 @@ class PacienteServiceTest {
         verify(turnoRepository, never()).findByPaciente_IdPaciente(anyLong());
         verify(tratamientoRepository, never()).findByPaciente_IdPaciente(anyLong());
         verify(usuarioRepository, never()).findAllById(any());
+    }
+
+    @Test
+    @DisplayName("B-25 - Debe asignar correctamente un médico de cabecera")
+    void asignarMedicoCabecera_Exitoso() {
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(usuarioRepository.findById(3L)).thenReturn(Optional.of(medico));
+
+        when(asignacionProfesionalPacienteRepository
+                .findFirstByPaciente_IdPacienteAndTipoAsignacionAndActivaTrue(
+                        1L,
+                        TipoAsignacionProfesional.MEDICO_CABECERA
+                ))
+                .thenReturn(Optional.empty());
+
+        when(asignacionProfesionalPacienteRepository
+                .save(any(AsignacionProfesionalPacienteEntity.class)))
+                .thenAnswer(invocation -> {
+                    AsignacionProfesionalPacienteEntity asignacion = invocation.getArgument(0);
+                    asignacion.setIdAsignacion(100L);
+                    return asignacion;
+                });
+
+        AsignacionProfesionalResponseDTO response =
+                pacienteService.asignarMedicoCabecera(1L, 3L);
+
+        assertNotNull(response);
+        assertEquals(100L, response.getIdAsignacion());
+        assertEquals(1L, response.getIdPaciente());
+        assertEquals(3L, response.getIdUsuario());
+        assertEquals("Medico Test", response.getNombreUsuario());
+        assertEquals(TipoAsignacionProfesional.MEDICO_CABECERA, response.getTipoAsignacion());
+        assertTrue(response.getActiva());
+        assertNotNull(response.getFechaDesde());
+        assertNull(response.getFechaHasta());
+
+        verify(asignacionProfesionalPacienteRepository)
+                .save(any(AsignacionProfesionalPacienteEntity.class));
+    }
+
+    @Test
+    @DisplayName("B-25 - Rechaza asignar como médico a un usuario que no tiene rol MEDICO")
+    void asignarMedicoCabecera_RolIncorrecto() {
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(cuidador));
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> pacienteService.asignarMedicoCabecera(1L, 2L)
+        );
+
+        assertEquals("El usuario indicado no tiene rol MEDICO", ex.getMessage());
+
+        verify(asignacionProfesionalPacienteRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("B-25 - Reemplazar médico conserva la asignación anterior como inactiva")
+    void asignarMedicoCabecera_ReemplazaAnterior() {
+        UsuarioEntity medicoAnterior = new UsuarioEntity();
+        medicoAnterior.setIdUsuario(4L);
+        medicoAnterior.setNombre("Medico Anterior");
+        medicoAnterior.setRol("MEDICO");
+        medicoAnterior.setActivo(true);
+
+        AsignacionProfesionalPacienteEntity asignacionAnterior =
+                new AsignacionProfesionalPacienteEntity();
+
+        asignacionAnterior.setIdAsignacion(50L);
+        asignacionAnterior.setPaciente(paciente);
+        asignacionAnterior.setUsuario(medicoAnterior);
+        asignacionAnterior.setTipoAsignacion(TipoAsignacionProfesional.MEDICO_CABECERA);
+        asignacionAnterior.setFechaDesde(LocalDateTime.now().minusMonths(2));
+        asignacionAnterior.setActiva(true);
+
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(usuarioRepository.findById(3L)).thenReturn(Optional.of(medico));
+
+        when(asignacionProfesionalPacienteRepository
+                .findFirstByPaciente_IdPacienteAndTipoAsignacionAndActivaTrue(
+                        1L,
+                        TipoAsignacionProfesional.MEDICO_CABECERA
+                ))
+                .thenReturn(Optional.of(asignacionAnterior));
+
+        when(asignacionProfesionalPacienteRepository
+                .save(any(AsignacionProfesionalPacienteEntity.class)))
+                .thenAnswer(invocation -> {
+                    AsignacionProfesionalPacienteEntity asignacion = invocation.getArgument(0);
+
+                    if (asignacion.getIdAsignacion() == null) {
+                        asignacion.setIdAsignacion(101L);
+                    }
+
+                    return asignacion;
+                });
+
+        AsignacionProfesionalResponseDTO response =
+                pacienteService.asignarMedicoCabecera(1L, 3L);
+
+        assertNotNull(response);
+        assertFalse(asignacionAnterior.getActiva());
+        assertNotNull(asignacionAnterior.getFechaHasta());
+        assertEquals(3L, response.getIdUsuario());
+        assertTrue(response.getActiva());
+
+        verify(asignacionProfesionalPacienteRepository, times(2))
+                .save(any(AsignacionProfesionalPacienteEntity.class));
+    }
+
+    @Test
+    @DisplayName("B-25 - Reasignar el mismo médico no crea un registro duplicado")
+    void asignarMedicoCabecera_MismoMedico_NoDuplica() {
+        AsignacionProfesionalPacienteEntity actual =
+                new AsignacionProfesionalPacienteEntity();
+
+        actual.setIdAsignacion(40L);
+        actual.setPaciente(paciente);
+        actual.setUsuario(medico);
+        actual.setTipoAsignacion(TipoAsignacionProfesional.MEDICO_CABECERA);
+        actual.setFechaDesde(LocalDateTime.now().minusDays(5));
+        actual.setActiva(true);
+
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(usuarioRepository.findById(3L)).thenReturn(Optional.of(medico));
+
+        when(asignacionProfesionalPacienteRepository
+                .findFirstByPaciente_IdPacienteAndTipoAsignacionAndActivaTrue(
+                        1L,
+                        TipoAsignacionProfesional.MEDICO_CABECERA
+                ))
+                .thenReturn(Optional.of(actual));
+
+        AsignacionProfesionalResponseDTO response =
+                pacienteService.asignarMedicoCabecera(1L, 3L);
+
+        assertNotNull(response);
+        assertEquals(40L, response.getIdAsignacion());
+
+        verify(asignacionProfesionalPacienteRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("B-25 - Debe agregar correctamente un cuidador")
+    void agregarCuidador_Exitoso() {
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(cuidador));
+
+        when(asignacionProfesionalPacienteRepository
+                .existsByPaciente_IdPacienteAndUsuario_IdUsuarioAndTipoAsignacionAndActivaTrue(
+                        1L,
+                        2L,
+                        TipoAsignacionProfesional.CUIDADOR
+                ))
+                .thenReturn(false);
+
+        when(asignacionProfesionalPacienteRepository
+                .save(any(AsignacionProfesionalPacienteEntity.class)))
+                .thenAnswer(invocation -> {
+                    AsignacionProfesionalPacienteEntity asignacion = invocation.getArgument(0);
+                    asignacion.setIdAsignacion(200L);
+                    return asignacion;
+                });
+
+        AsignacionProfesionalResponseDTO response =
+                pacienteService.agregarCuidador(1L, 2L);
+
+        assertNotNull(response);
+        assertEquals(200L, response.getIdAsignacion());
+        assertEquals(1L, response.getIdPaciente());
+        assertEquals(2L, response.getIdUsuario());
+        assertEquals("Cuidador Test", response.getNombreUsuario());
+        assertEquals(TipoAsignacionProfesional.CUIDADOR, response.getTipoAsignacion());
+        assertTrue(response.getActiva());
+
+        verify(asignacionProfesionalPacienteRepository)
+                .save(any(AsignacionProfesionalPacienteEntity.class));
+    }
+
+    @Test
+    @DisplayName("B-25 - Rechaza asignar como cuidador a un usuario que no tiene rol CUIDADOR")
+    void agregarCuidador_RolIncorrecto() {
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(usuarioRepository.findById(3L)).thenReturn(Optional.of(medico));
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> pacienteService.agregarCuidador(1L, 3L)
+        );
+
+        assertEquals("El usuario indicado no tiene rol CUIDADOR", ex.getMessage());
+
+        verify(asignacionProfesionalPacienteRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("B-25 - No permite asignar dos veces el mismo cuidador activo")
+    void agregarCuidador_YaAsignado() {
+        when(pacienteRepository.findById(1L)).thenReturn(Optional.of(paciente));
+        when(usuarioRepository.findById(2L)).thenReturn(Optional.of(cuidador));
+
+        when(asignacionProfesionalPacienteRepository
+                .existsByPaciente_IdPacienteAndUsuario_IdUsuarioAndTipoAsignacionAndActivaTrue(
+                        1L,
+                        2L,
+                        TipoAsignacionProfesional.CUIDADOR
+                ))
+                .thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> pacienteService.agregarCuidador(1L, 2L)
+        );
+
+        assertEquals(
+                "El cuidador ya se encuentra asignado al paciente",
+                ex.getMessage()
+        );
+
+        verify(asignacionProfesionalPacienteRepository, never()).save(any());
     }
 }
