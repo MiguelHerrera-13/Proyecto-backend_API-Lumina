@@ -7,11 +7,8 @@ import java.time.LocalDate;
 
 public class PacienteRequestDTO {
 
-    @NotBlank(message = "El nombre no puede estar vacío")
     private String nombreCompleto;
 
-    @NotNull(message = "La fecha de nacimiento es obligatoria")
-    @Past(message = "La fecha de nacimiento debe ser en el pasado")
     private LocalDate fechaNacimiento;
     
     private String diagnosticoFase;
