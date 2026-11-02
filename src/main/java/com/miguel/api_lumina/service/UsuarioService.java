@@ -5,21 +5,38 @@ import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.exception.EmailYaRegistradoException;
 import com.miguel.api_lumina.repository.UsuarioRepository;
+import com.miguel.api_lumina.entity.TokenVerificacionEntity;
+import com.miguel.api_lumina.repository.TokenVerificacionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TokenVerificacionRepository tokenVerificacionRepository;
+    private final EmailService emailService;
 
     public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+        this(usuarioRepository, passwordEncoder, null, null);
+    }
+
+    @Autowired
+    public UsuarioService(UsuarioRepository usuarioRepository,
+                          PasswordEncoder passwordEncoder,
+                          TokenVerificacionRepository tokenVerificacionRepository,
+                          EmailService emailService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tokenVerificacionRepository = tokenVerificacionRepository;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -33,9 +50,27 @@ public class UsuarioService {
         entity.setEmail(request.getEmail());
         entity.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         entity.setRol(request.getRol());
-        entity.setActivo(true);
+        // La cuenta inicia inactiva hasta que confirme el correo de verificación
+        entity.setActivo(false);
 
         UsuarioEntity saved = usuarioRepository.save(entity);
+
+        // Generar token de verificación único de 6 dígitos alfanuméricos en mayúsculas
+        String token = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+
+        if (tokenVerificacionRepository != null) {
+            TokenVerificacionEntity tokenEntity = new TokenVerificacionEntity(
+                    token,
+                    saved,
+                    LocalDateTime.now().plusHours(24)
+            );
+            tokenVerificacionRepository.save(tokenEntity);
+        }
+
+        if (emailService != null) {
+            emailService.enviarCorreoVerificacion(saved, token);
+        }
+
         return mapearADTO(saved);
     }
 

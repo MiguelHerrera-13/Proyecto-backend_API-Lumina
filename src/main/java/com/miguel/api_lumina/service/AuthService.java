@@ -49,6 +49,12 @@ public class AuthService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final TokenBlacklistService tokenBlacklistService;
 
+    @Autowired(required = false)
+    private com.miguel.api_lumina.repository.TokenVerificacionRepository tokenVerificacionRepository;
+
+    @Autowired(required = false)
+    private EmailService emailService;
+
     @Value("${auth.reset-token.expiration-minutes:15}")
     private long tokenExpirationMinutes = 15;
 
@@ -301,6 +307,38 @@ public class AuthService {
 
         log.info("Contraseña actualizada exitosamente para el usuario [{}] mediante cambio de contraseña", email);
         return new ChangePasswordResponseDTO("Contraseña actualizada exitosamente");
+    }
+
+    @Transactional
+    public String activarCuenta(String token) {
+        if (token == null || token.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El código o token de activación es requerido.");
+        }
+
+        if (tokenVerificacionRepository == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Servicio de verificación no disponible.");
+        }
+
+        com.miguel.api_lumina.entity.TokenVerificacionEntity tokenEntity = tokenVerificacionRepository.findByToken(token.trim().toUpperCase())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "El token de activación no es válido o no existe."));
+
+        if (Boolean.TRUE.equals(tokenEntity.getUsado())) {
+            return "Tu cuenta ya fue activada previamente. Ya puedes iniciar sesión en Lumina.";
+        }
+
+        if (tokenEntity.isExpirado()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El token de activación ha expirado. Solicita un nuevo correo de verificación.");
+        }
+
+        UsuarioEntity usuario = tokenEntity.getUsuario();
+        usuario.setActivo(true);
+        usuarioRepository.save(usuario);
+
+        tokenEntity.setUsado(true);
+        tokenVerificacionRepository.save(tokenEntity);
+
+        log.info("Cuenta activada exitosamente para el usuario [{}] con token [{}]", usuario.getEmail(), token);
+        return "¡Tu cuenta ha sido activada con éxito! Ya puedes iniciar sesión con tu correo " + usuario.getEmail();
     }
 
     private boolean isBcryptHash(String hash) {
