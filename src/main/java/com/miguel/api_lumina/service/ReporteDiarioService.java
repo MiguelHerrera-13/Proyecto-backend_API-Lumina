@@ -33,39 +33,36 @@ public class ReporteDiarioService {
     @Transactional
     public ReporteDiarioEntity registrarReporte(ReporteDiarioRequestDTO requestDTO) {
 
-        TurnoEntity turno = null;
-        if (requestDTO.getIdTurno() != null) {
-            turno = turnoRepository.findById(requestDTO.getIdTurno()).orElse(null);
-        }
-        if (turno == null) {
-            turno = turnoRepository.findAll().stream().findFirst().orElseGet(() -> {
-                TurnoEntity t = new TurnoEntity();
-                t.setFechaHoraInicio(java.time.LocalDateTime.now());
-                t.setFechaHoraFin(java.time.LocalDateTime.now().plusHours(1));
-                t.setEstado("CONFIRMADO");
-                t.setVersion(0);
-                return turnoRepository.save(t);
-            });
-        }
+        TurnoEntity turno = turnoRepository.findById(requestDTO.getIdTurno())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "El turno con ID " + requestDTO.getIdTurno() + " no existe"
+                ));
 
         ReporteDiarioEntity entity = new ReporteDiarioEntity();
         entity.setTurno(turno);
         entity.setTemperatura(requestDTO.getTemperatura());
         entity.setPresionArterial(requestDTO.getPresionArterial());
         entity.setObservacion(requestDTO.getObservacion());
-        entity.setFechaRegistro(java.time.LocalDateTime.now());
 
         ReporteDiarioEntity reporteGuardado = reporteDiarioRepository.save(entity);
 
         if (esReporteCritico(reporteGuardado)) {
-            if (turno.getMedico() != null) {
-                String mensaje = generarMensajeAlerta(reporteGuardado);
-                alertaService.crearAlerta(
-                        reporteGuardado,
-                        turno.getMedico(),
-                        mensaje
+
+            if (turno.getMedico() == null) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "El turno no tiene un médico asignado"
                 );
             }
+
+            String mensaje = generarMensajeAlerta(reporteGuardado);
+
+            alertaService.crearAlerta(
+                    reporteGuardado,
+                    turno.getMedico(),
+                    mensaje
+            );
         }
 
         return reporteGuardado;
