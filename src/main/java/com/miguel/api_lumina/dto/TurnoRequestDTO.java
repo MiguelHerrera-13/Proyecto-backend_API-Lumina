@@ -11,32 +11,15 @@ public class TurnoRequestDTO {
     private LocalDateTime fechaHoraFin;
     private String estado;
 
-    // Campos compatibles con el frontend móvil
-    private Long pacienteId;
-    private String nombreMedico;
-    private String fecha;
-    private String horaInicio;
-    private String horaFin;
-    private String motivo;
-    private String fechaHora;
-
     public TurnoRequestDTO() {
     }
 
     public Long getIdPaciente() {
-        return idPaciente != null ? idPaciente : pacienteId;
+        return idPaciente;
     }
 
     public void setIdPaciente(Long idPaciente) {
         this.idPaciente = idPaciente;
-    }
-
-    public Long getPacienteId() {
-        return pacienteId != null ? pacienteId : idPaciente;
-    }
-
-    public void setPacienteId(Long pacienteId) {
-        this.pacienteId = pacienteId;
     }
 
     public Long getIdCuidador() {
@@ -78,53 +61,4 @@ public class TurnoRequestDTO {
     public void setEstado(String estado) {
         this.estado = estado;
     }
-
-    public String getNombreMedico() {
-        return nombreMedico;
-    }
-
-    public void setNombreMedico(String nombreMedico) {
-        this.nombreMedico = nombreMedico;
-    }
-
-    public String getFecha() {
-        return fecha;
-    }
-
-    public void setFecha(String fecha) {
-        this.fecha = fecha;
-    }
-
-    public String getHoraInicio() {
-        return horaInicio;
-    }
-
-    public void setHoraInicio(String horaInicio) {
-        this.horaInicio = horaInicio;
-    }
-
-    public String getHoraFin() {
-        return horaFin;
-    }
-
-    public void setHoraFin(String horaFin) {
-        this.horaFin = horaFin;
-    }
-
-    public String getMotivo() {
-        return motivo;
-    }
-
-    public void setMotivo(String motivo) {
-        this.motivo = motivo;
-    }
-
-    public String getFechaHora() {
-        return fechaHora;
-    }
-
-    public void setFechaHora(String fechaHora) {
-        this.fechaHora = fechaHora;
-    }
 }
-

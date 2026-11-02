@@ -52,81 +52,38 @@ public class TurnoService {
 
     @Transactional
     public TurnoResponseDTO crearTurno(TurnoRequestDTO dto) {
-        LocalDateTime inicio = dto.getFechaHoraInicio();
-        LocalDateTime fin = dto.getFechaHoraFin();
-
-        if (inicio == null && dto.getFecha() != null && dto.getHoraInicio() != null) {
-            try {
-                String hIni = dto.getHoraInicio().length() == 5 ? dto.getHoraInicio() + ":00" : dto.getHoraInicio();
-                inicio = LocalDateTime.parse(dto.getFecha() + "T" + hIni);
-            } catch (Exception ignored) {}
+        if (dto.getFechaHoraInicio() == null || dto.getFechaHoraFin() == null) {
+            throw new IllegalArgumentException("Las fechas de inicio y fin son obligatorias");
         }
 
-        if (fin == null && dto.getFecha() != null && dto.getHoraFin() != null) {
-            try {
-                String hFin = dto.getHoraFin().length() == 5 ? dto.getHoraFin() + ":00" : dto.getHoraFin();
-                fin = LocalDateTime.parse(dto.getFecha() + "T" + hFin);
-            } catch (Exception ignored) {}
+        if (!dto.getFechaHoraInicio().isBefore(dto.getFechaHoraFin())) {
+            throw new IllegalArgumentException("La fecha de inicio debe ser anterior a la de fin");
         }
 
-        if (inicio == null) {
-            inicio = LocalDateTime.now().plusDays(1).withHour(9).withMinute(0).withSecond(0).withNano(0);
-        }
-        if (fin == null) {
-            fin = inicio.plusHours(1);
+        PacienteEntity paciente = pacienteRepository.findById(dto.getIdPaciente())
+                .orElseThrow(() -> new IllegalArgumentException("El paciente no existe"));
+
+        UsuarioEntity cuidador = usuarioRepository.findById(dto.getIdCuidador())
+                .orElseThrow(() -> new IllegalArgumentException("El cuidador no existe"));
+
+        if (dto.getIdMedico() == null) {
+            throw new IllegalArgumentException("El médico es obligatorio");
         }
 
-        if (!inicio.isBefore(fin)) {
-            fin = inicio.plusHours(1);
-        }
+        UsuarioEntity medico = usuarioRepository.findById(dto.getIdMedico())
+                .orElseThrow(() -> new IllegalArgumentException("El médico no existe"));
 
-        Long pacId = dto.getIdPaciente();
-        PacienteEntity paciente = null;
-        if (pacId != null) {
-            paciente = pacienteRepository.findById(pacId).orElse(null);
-        }
-        if (paciente == null) {
-            paciente = pacienteRepository.findAll().stream().findFirst().orElse(null);
-        }
-        if (paciente == null) {
-            throw new IllegalArgumentException("No hay pacientes registrados en el sistema");
-        }
-
-        Long cuidadorId = dto.getIdCuidador();
-        UsuarioEntity cuidador = null;
-        if (cuidadorId != null) {
-            cuidador = usuarioRepository.findById(cuidadorId).orElse(null);
-        }
-        if (cuidador == null) {
-            cuidador = usuarioRepository.findAll().stream()
-                    .filter(u -> "EMPLEADO".equalsIgnoreCase(u.getRol()) || "CUIDADOR".equalsIgnoreCase(u.getRol()))
-                    .findFirst().orElse(null);
-        }
-
-        Long medicoId = dto.getIdMedico();
-        UsuarioEntity medico = null;
-        if (medicoId != null) {
-            medico = usuarioRepository.findById(medicoId).orElse(null);
-        }
-        if (medico == null) {
-            medico = usuarioRepository.findAll().stream()
-                    .filter(u -> "SUPER_ADMIN".equalsIgnoreCase(u.getRol()) || "MEDICO".equalsIgnoreCase(u.getRol()) || "ADMIN".equalsIgnoreCase(u.getRol()))
-                    .findFirst().orElse(null);
-        }
-        if (medico == null) {
-            medico = usuarioRepository.findAll().stream().findFirst().orElse(null);
+        if (medico.getRol() != null && !medico.getRol().equalsIgnoreCase("MEDICO")) {
+            throw new IllegalArgumentException("El usuario indicado no tiene rol de MEDICO");
         }
 
         TurnoEntity turno = new TurnoEntity();
         turno.setPaciente(paciente);
         turno.setCuidador(cuidador);
         turno.setMedico(medico);
-        turno.setFechaHoraInicio(inicio);
-        turno.setFechaHoraFin(fin);
-        turno.setEstado(dto.getEstado() != null ? dto.getEstado() : "CONFIRMADO");
-        if (dto.getMotivo() != null) {
-            turno.setMotivoReprogramacion(dto.getMotivo());
-        }
+        turno.setFechaHoraInicio(dto.getFechaHoraInicio());
+        turno.setFechaHoraFin(dto.getFechaHoraFin());
+        turno.setEstado(dto.getEstado() != null ? dto.getEstado() : "PENDIENTE");
 
         TurnoEntity turnoGuardado = turnoRepository.save(turno);
 
@@ -337,9 +294,6 @@ public class TurnoService {
     @Transactional(readOnly = true)
     public List<TurnoResponseDTO> obtenerTurnosPorCuidador(Long idCuidador) {
         List<TurnoEntity> turnos = turnoRepository.findByCuidador_IdUsuario(idCuidador);
-        if (turnos.isEmpty()) {
-            turnos = turnoRepository.findAll();
-        }
         return turnos.stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
