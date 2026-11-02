@@ -10,3 +10,4 @@ import java.util.List;
 public interface RegistroEnvioMailRepository extends JpaRepository<RegistroEnvioMailEntity, Long> {
     List<RegistroEnvioMailEntity> findByDestinatarioOrderByFechaEnvioDesc(String destinatario);
 }
+

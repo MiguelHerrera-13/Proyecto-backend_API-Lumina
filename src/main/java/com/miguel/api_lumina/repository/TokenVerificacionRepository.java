@@ -12,3 +12,4 @@ public interface TokenVerificacionRepository extends JpaRepository<TokenVerifica
     Optional<TokenVerificacionEntity> findByToken(String token);
     Optional<TokenVerificacionEntity> findTopByUsuarioOrderByFechaCreacionDesc(UsuarioEntity usuario);
 }
+

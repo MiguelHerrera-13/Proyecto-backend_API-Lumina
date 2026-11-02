@@ -106,3 +106,4 @@ public class RegistroEnvioMailEntity {
         this.fechaEnvio = fechaEnvio;
     }
 }
+
