@@ -54,6 +54,10 @@ public class PacienteService {
         return pacienteRepository.findById(id);
     }
 
+    public List<PacienteEntity> obtenerTodos() {
+        return pacienteRepository.findAll();
+    }
+
     @Transactional
     public void darDeBajaPaciente(Long id) {
         pacienteRepository.findById(id).ifPresent(pacienteRepository::delete);
