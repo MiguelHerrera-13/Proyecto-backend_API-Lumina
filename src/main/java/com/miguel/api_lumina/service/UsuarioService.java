@@ -41,19 +41,30 @@ public class UsuarioService {
 
     @Transactional
     public UsuarioResponseDTO registrarUsuario(UsuarioRequestDTO request) {
-        if (usuarioRepository.existsByEmail(request.getEmail())) {
-            throw new EmailYaRegistradoException("El email ya se encuentra registrado");
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        Optional<UsuarioEntity> existenteOpt = usuarioRepository.findByEmail(email);
+
+        UsuarioEntity saved;
+        if (existenteOpt.isPresent()) {
+            UsuarioEntity existente = existenteOpt.get();
+            if (Boolean.TRUE.equals(existente.getActivo())) {
+                throw new EmailYaRegistradoException("El correo ya se encuentra registrado y activo. Puedes iniciar sesión directamente.");
+            }
+            // Si la cuenta estaba registrada pero inactiva (ej. el token anterior expiró o no se pudo activar), actualizamos y reenviamos
+            existente.setNombre(request.getNombre());
+            existente.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            existente.setRol(request.getRol());
+            saved = usuarioRepository.save(existente);
+        } else {
+            UsuarioEntity entity = new UsuarioEntity();
+            entity.setNombre(request.getNombre());
+            entity.setEmail(email);
+            entity.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            entity.setRol(request.getRol());
+            // La cuenta inicia inactiva hasta que confirme el correo de verificación
+            entity.setActivo(false);
+            saved = usuarioRepository.save(entity);
         }
-
-        UsuarioEntity entity = new UsuarioEntity();
-        entity.setNombre(request.getNombre());
-        entity.setEmail(request.getEmail());
-        entity.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        entity.setRol(request.getRol());
-        // La cuenta inicia inactiva hasta que confirme el correo de verificación
-        entity.setActivo(false);
-
-        UsuarioEntity saved = usuarioRepository.save(entity);
 
         // Generar token de verificación único de 6 dígitos alfanuméricos en mayúsculas
         String token = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();

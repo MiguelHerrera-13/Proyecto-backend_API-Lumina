@@ -139,7 +139,7 @@ public class AuthService {
             refreshTokenStr = refreshToken.getToken();
         }
 
-        return new AuthResponseDTO(token, "Bearer", usuario.getEmail(), usuario.getRol(), refreshTokenStr);
+        return new AuthResponseDTO(token, "Bearer", usuario.getEmail(), usuario.getRol(), refreshTokenStr, usuario.getNombre());
     }
 
     @Transactional

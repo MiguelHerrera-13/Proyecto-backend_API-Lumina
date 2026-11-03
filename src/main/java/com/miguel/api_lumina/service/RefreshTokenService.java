@@ -94,7 +94,7 @@ public class RefreshTokenService {
 
         log.info("Refresh token rotado exitosamente para el usuario [{}]. Nuevo refresh token: {}", usuario.getEmail(), newUUID);
 
-        return new AuthResponseDTO(newAccessToken, "Bearer", usuario.getEmail(), usuario.getRol(), savedNewRefreshToken.getToken());
+        return new AuthResponseDTO(newAccessToken, "Bearer", usuario.getEmail(), usuario.getRol(), savedNewRefreshToken.getToken(), usuario.getNombre());
     }
 
     @Transactional
