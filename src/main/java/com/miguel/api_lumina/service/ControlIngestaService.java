@@ -29,19 +29,6 @@ public class ControlIngestaService {
     }
 
     @Transactional
-    public ControlIngestaResponseDTO registrarIngestaGeneral(ControlIngestaRequestDTO dto) {
-        ReporteDiarioEntity reporte = reporteDiarioRepository.findAll().stream().findFirst().orElseGet(() -> {
-            ReporteDiarioEntity nuevo = new ReporteDiarioEntity();
-            nuevo.setTemperatura(36.5);
-            nuevo.setPresionArterial("120/80");
-            nuevo.setObservacion("Registro automático de ingesta");
-            nuevo.setFechaRegistro(LocalDateTime.now());
-            return reporteDiarioRepository.save(nuevo);
-        });
-        return registrarIngesta(reporte.getIdReporte(), dto);
-    }
-
-    @Transactional
     public ControlIngestaResponseDTO registrarIngesta(Long idReporte, ControlIngestaRequestDTO dto) {
         ReporteDiarioEntity reporte = reporteDiarioRepository.findById(idReporte)
                 .orElseThrow(() -> new ResponseStatusException(

@@ -106,40 +106,4 @@ public class TurnoResponseDTO {
     public void setMotivoReprogramacion(String motivoReprogramacion) {
         this.motivoReprogramacion = motivoReprogramacion;
     }
-
-    // Métodos para compatibilidad total con el frontend Android
-    public Long getId() {
-        return idTurno;
-    }
-
-    public String getFechaHora() {
-        if (fechaHoraInicio != null) {
-            return fechaHoraInicio.toString();
-        }
-        return null;
-    }
-
-    public String getMotivo() {
-        if (motivoReprogramacion != null && !motivoReprogramacion.isBlank()) return motivoReprogramacion;
-        if (motivoCancelacion != null && !motivoCancelacion.isBlank()) return motivoCancelacion;
-        return "Consulta médica y seguimiento";
-    }
-
-    public String getHabitacion() {
-        return "Hab. 204";
-    }
-
-    public String getHoraInicio() {
-        if (fechaHoraInicio != null) {
-            return String.format("%02d:%02d", fechaHoraInicio.getHour(), fechaHoraInicio.getMinute());
-        }
-        return null;
-    }
-
-    public String getHoraFin() {
-        if (fechaHoraFin != null) {
-            return String.format("%02d:%02d", fechaHoraFin.getHour(), fechaHoraFin.getMinute());
-        }
-        return null;
-    }
 }

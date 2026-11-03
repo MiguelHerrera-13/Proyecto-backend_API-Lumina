@@ -29,22 +29,6 @@ public class ControlIngestaController {
         return new ResponseEntity<>(creado, HttpStatus.CREATED);
     }
 
-    @PostMapping("/ingestas")
-    public ResponseEntity<ControlIngestaResponseDTO> registrarIngestaGeneral(
-            @RequestBody ControlIngestaRequestDTO requestDTO) {
-        if (requestDTO.getTipoComida() == null || requestDTO.getTipoComida().isBlank()) {
-            requestDTO.setTipoComida("ALMUERZO");
-        }
-        if (requestDTO.getPorcentajeConsumido() == null) {
-            requestDTO.setPorcentajeConsumido(100);
-        }
-        if (requestDTO.getAguaMl() == null) {
-            requestDTO.setAguaMl(250);
-        }
-        ControlIngestaResponseDTO creado = controlIngestaService.registrarIngestaGeneral(requestDTO);
-        return new ResponseEntity<>(creado, HttpStatus.CREATED);
-    }
-
     @GetMapping("/{idReporte}/ingestas")
     public ResponseEntity<List<ControlIngestaResponseDTO>> obtenerIngestasPorReporte(
             @PathVariable Long idReporte) {

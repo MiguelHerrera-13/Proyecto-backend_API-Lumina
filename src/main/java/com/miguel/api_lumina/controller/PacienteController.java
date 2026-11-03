@@ -5,6 +5,7 @@ import com.miguel.api_lumina.dto.PacienteRequestDTO;
 import com.miguel.api_lumina.dto.PacienteResponseDTO;
 import com.miguel.api_lumina.entity.PacienteEntity;
 import com.miguel.api_lumina.service.PacienteService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -56,7 +57,7 @@ public class PacienteController {
     }
 
     @PostMapping
-    public ResponseEntity<PacienteResponseDTO> crearPaciente(@RequestBody PacienteRequestDTO requestDTO) {
+    public ResponseEntity<PacienteResponseDTO> crearPaciente(@Valid @RequestBody PacienteRequestDTO requestDTO) {
         PacienteEntity entity = new PacienteEntity();
         entity.setNombreCompleto(requestDTO.getNombreCompleto() != null && !requestDTO.getNombreCompleto().isBlank()
                 ? requestDTO.getNombreCompleto().trim() : "Paciente Lumina");
