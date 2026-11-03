@@ -32,6 +32,17 @@ public class UsuarioController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @GetMapping
+    public ResponseEntity<java.util.List<UsuarioResponseDTO>> obtenerUsuarios(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String rol) {
+        if ("EMPLEADOS_Y_MEDICOS".equalsIgnoreCase(rol)) {
+            return ResponseEntity.ok(usuarioService.obtenerEmpleadosYMedicos());
+        } else if (rol != null && !rol.isBlank()) {
+            return ResponseEntity.ok(usuarioService.obtenerPorRol(rol));
+        }
+        return ResponseEntity.ok(usuarioService.obtenerTodos());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> obtenerUsuario(@PathVariable Long id) {
         Optional<UsuarioResponseDTO> usuario = usuarioService.obtenerUsuarioPorId(id);

@@ -17,7 +17,7 @@ public class UsuarioRequestDTO {
     private String password;
 
     @NotBlank(message = "El rol no puede estar vacío")
-    @Pattern(regexp = "^(ADMIN|MEDICO|CUIDADOR)$", message = "El rol debe ser ADMIN, MEDICO o CUIDADOR")
+    @Pattern(regexp = "^(ADMIN|MEDICO|CUIDADOR|FAMILIAR|USUARIO|EMPLEADO|SUPER_ADMIN)$", message = "El rol debe ser válido (ADMIN, MEDICO, CUIDADOR, FAMILIAR, USUARIO, EMPLEADO, SUPER_ADMIN)")
     private String rol;
 
     public UsuarioRequestDTO() {

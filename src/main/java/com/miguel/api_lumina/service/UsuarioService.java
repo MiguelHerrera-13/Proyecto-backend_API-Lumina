@@ -5,43 +5,120 @@ import com.miguel.api_lumina.dto.UsuarioResponseDTO;
 import com.miguel.api_lumina.entity.UsuarioEntity;
 import com.miguel.api_lumina.exception.EmailYaRegistradoException;
 import com.miguel.api_lumina.repository.UsuarioRepository;
+import com.miguel.api_lumina.entity.TokenVerificacionEntity;
+import com.miguel.api_lumina.repository.TokenVerificacionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TokenVerificacionRepository tokenVerificacionRepository;
+    private final EmailService emailService;
 
     public UsuarioService(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder) {
+        this(usuarioRepository, passwordEncoder, null, null);
+    }
+
+    @Autowired
+    public UsuarioService(UsuarioRepository usuarioRepository,
+                          PasswordEncoder passwordEncoder,
+                          TokenVerificacionRepository tokenVerificacionRepository,
+                          EmailService emailService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.tokenVerificacionRepository = tokenVerificacionRepository;
+        this.emailService = emailService;
     }
 
     @Transactional
     public UsuarioResponseDTO registrarUsuario(UsuarioRequestDTO request) {
-        if (usuarioRepository.existsByEmail(request.getEmail())) {
-            throw new EmailYaRegistradoException("El email ya se encuentra registrado");
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        Optional<UsuarioEntity> existenteOpt = usuarioRepository.findByEmail(email);
+
+        UsuarioEntity saved;
+        if (existenteOpt.isPresent()) {
+            UsuarioEntity existente = existenteOpt.get();
+            if (Boolean.TRUE.equals(existente.getActivo())) {
+                throw new EmailYaRegistradoException("El correo ya se encuentra registrado y activo. Puedes iniciar sesión directamente.");
+            }
+            // Si la cuenta estaba registrada pero inactiva (ej. el token anterior expiró o no se pudo activar), actualizamos y reenviamos
+            existente.setNombre(request.getNombre());
+            existente.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            existente.setRol(request.getRol());
+            saved = usuarioRepository.save(existente);
+        } else {
+            UsuarioEntity entity = new UsuarioEntity();
+            entity.setNombre(request.getNombre());
+            entity.setEmail(email);
+            entity.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            entity.setRol(request.getRol());
+            // La cuenta inicia inactiva hasta que confirme el correo de verificación
+            entity.setActivo(false);
+            saved = usuarioRepository.save(entity);
         }
 
-        UsuarioEntity entity = new UsuarioEntity();
-        entity.setNombre(request.getNombre());
-        entity.setEmail(request.getEmail());
-        entity.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        entity.setRol(request.getRol());
-        entity.setActivo(true);
+        // Generar token de verificación único de 6 dígitos alfanuméricos en mayúsculas
+        String token = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
 
-        UsuarioEntity saved = usuarioRepository.save(entity);
+        if (tokenVerificacionRepository != null) {
+            TokenVerificacionEntity tokenEntity = new TokenVerificacionEntity(
+                    token,
+                    saved,
+                    LocalDateTime.now().plusHours(24)
+            );
+            tokenVerificacionRepository.save(tokenEntity);
+        }
+
+        if (emailService != null) {
+            emailService.enviarCorreoVerificacion(saved, token);
+        }
+
         return mapearADTO(saved);
     }
 
     @Transactional(readOnly = true)
     public Optional<UsuarioResponseDTO> obtenerUsuarioPorId(Long id) {
         return usuarioRepository.findById(id).map(this::mapearADTO);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UsuarioResponseDTO> obtenerTodos() {
+        return usuarioRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getActivo()))
+                .map(this::mapearADTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UsuarioResponseDTO> obtenerPorRol(String rol) {
+        return usuarioRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getActivo()) && u.getRol() != null && u.getRol().equalsIgnoreCase(rol))
+                .map(this::mapearADTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UsuarioResponseDTO> obtenerEmpleadosYMedicos() {
+        return usuarioRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getActivo()) && u.getRol() != null && (
+                        u.getRol().equalsIgnoreCase("MEDICO") ||
+                        u.getRol().equalsIgnoreCase("EMPLEADO") ||
+                        u.getRol().equalsIgnoreCase("CUIDADOR") ||
+                        u.getRol().equalsIgnoreCase("ENFERMERO") ||
+                        u.getRol().equalsIgnoreCase("SUPER_ADMIN") ||
+                        u.getRol().equalsIgnoreCase("ADMIN")
+                ))
+                .map(this::mapearADTO)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     @Transactional
