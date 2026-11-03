@@ -90,6 +90,37 @@ public class UsuarioService {
         return usuarioRepository.findById(id).map(this::mapearADTO);
     }
 
+    @Transactional(readOnly = true)
+    public java.util.List<UsuarioResponseDTO> obtenerTodos() {
+        return usuarioRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getActivo()))
+                .map(this::mapearADTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UsuarioResponseDTO> obtenerPorRol(String rol) {
+        return usuarioRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getActivo()) && u.getRol() != null && u.getRol().equalsIgnoreCase(rol))
+                .map(this::mapearADTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<UsuarioResponseDTO> obtenerEmpleadosYMedicos() {
+        return usuarioRepository.findAll().stream()
+                .filter(u -> Boolean.TRUE.equals(u.getActivo()) && u.getRol() != null && (
+                        u.getRol().equalsIgnoreCase("MEDICO") ||
+                        u.getRol().equalsIgnoreCase("EMPLEADO") ||
+                        u.getRol().equalsIgnoreCase("CUIDADOR") ||
+                        u.getRol().equalsIgnoreCase("ENFERMERO") ||
+                        u.getRol().equalsIgnoreCase("SUPER_ADMIN") ||
+                        u.getRol().equalsIgnoreCase("ADMIN")
+                ))
+                .map(this::mapearADTO)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     @Transactional
     public void darDeBajaUsuario(Long id) {
         usuarioRepository.findById(id).ifPresent(usuario -> {

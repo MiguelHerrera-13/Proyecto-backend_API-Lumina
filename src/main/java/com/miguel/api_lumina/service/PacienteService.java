@@ -128,7 +128,14 @@ public class PacienteService {
                 paciente.getNombreCompleto(),
                 paciente.getFechaNacimiento(),
                 paciente.getDiagnosticoFase(),
-                paciente.getActivo()
+                paciente.getActivo(),
+                paciente.getIdEmpleadoAsignado(),
+                paciente.getNombreEmpleadoAsignado(),
+                paciente.getRolEmpleadoAsignado(),
+                paciente.getIdFamiliarAsignado(),
+                paciente.getNombreFamiliarAsignado(),
+                paciente.getEmailFamiliarAsignado(),
+                paciente.getParentescoFamiliar()
         );
     }
 

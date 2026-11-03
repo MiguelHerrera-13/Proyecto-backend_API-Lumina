@@ -31,6 +31,27 @@ public class PacienteEntity {
     @Column(name = "diagnostico_fase")
     private String diagnosticoFase;
 
+    @Column(name = "id_empleado_asignado")
+    private Long idEmpleadoAsignado;
+
+    @Column(name = "nombre_empleado_asignado", length = 150)
+    private String nombreEmpleadoAsignado;
+
+    @Column(name = "rol_empleado_asignado", length = 50)
+    private String rolEmpleadoAsignado;
+
+    @Column(name = "id_familiar_asignado")
+    private Long idFamiliarAsignado;
+
+    @Column(name = "nombre_familiar_asignado", length = 150)
+    private String nombreFamiliarAsignado;
+
+    @Column(name = "email_familiar_asignado", length = 150)
+    private String emailFamiliarAsignado;
+
+    @Column(name = "parentesco_familiar", length = 50)
+    private String parentescoFamiliar;
+
     @Column(name = "activo")
     private Boolean activo = true;
 
@@ -67,6 +88,62 @@ public class PacienteEntity {
 
     public void setDiagnosticoFase(String diagnosticoFase) {
         this.diagnosticoFase = diagnosticoFase;
+    }
+
+    public Long getIdEmpleadoAsignado() {
+        return idEmpleadoAsignado;
+    }
+
+    public void setIdEmpleadoAsignado(Long idEmpleadoAsignado) {
+        this.idEmpleadoAsignado = idEmpleadoAsignado;
+    }
+
+    public String getNombreEmpleadoAsignado() {
+        return nombreEmpleadoAsignado;
+    }
+
+    public void setNombreEmpleadoAsignado(String nombreEmpleadoAsignado) {
+        this.nombreEmpleadoAsignado = nombreEmpleadoAsignado;
+    }
+
+    public String getRolEmpleadoAsignado() {
+        return rolEmpleadoAsignado;
+    }
+
+    public void setRolEmpleadoAsignado(String rolEmpleadoAsignado) {
+        this.rolEmpleadoAsignado = rolEmpleadoAsignado;
+    }
+
+    public Long getIdFamiliarAsignado() {
+        return idFamiliarAsignado;
+    }
+
+    public void setIdFamiliarAsignado(Long idFamiliarAsignado) {
+        this.idFamiliarAsignado = idFamiliarAsignado;
+    }
+
+    public String getNombreFamiliarAsignado() {
+        return nombreFamiliarAsignado;
+    }
+
+    public void setNombreFamiliarAsignado(String nombreFamiliarAsignado) {
+        this.nombreFamiliarAsignado = nombreFamiliarAsignado;
+    }
+
+    public String getEmailFamiliarAsignado() {
+        return emailFamiliarAsignado;
+    }
+
+    public void setEmailFamiliarAsignado(String emailFamiliarAsignado) {
+        this.emailFamiliarAsignado = emailFamiliarAsignado;
+    }
+
+    public String getParentescoFamiliar() {
+        return parentescoFamiliar;
+    }
+
+    public void setParentescoFamiliar(String parentescoFamiliar) {
+        this.parentescoFamiliar = parentescoFamiliar;
     }
 
     public Boolean getActivo() {

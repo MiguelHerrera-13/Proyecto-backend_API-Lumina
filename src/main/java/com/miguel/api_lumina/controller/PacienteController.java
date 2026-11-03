@@ -1,16 +1,18 @@
 package com.miguel.api_lumina.controller;
 
+import com.miguel.api_lumina.dto.HistorialDTO;
 import com.miguel.api_lumina.dto.PacienteRequestDTO;
 import com.miguel.api_lumina.dto.PacienteResponseDTO;
 import com.miguel.api_lumina.entity.PacienteEntity;
 import com.miguel.api_lumina.service.PacienteService;
-import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.miguel.api_lumina.dto.HistorialDTO;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/pacientes")
@@ -22,67 +24,68 @@ public class PacienteController {
         this.pacienteService = pacienteService;
     }
 
+    private PacienteResponseDTO mapearResponse(PacienteEntity p) {
+        return new PacienteResponseDTO(
+                p.getIdPaciente(),
+                p.getNombreCompleto(),
+                p.getFechaNacimiento(),
+                p.getDiagnosticoFase(),
+                p.getActivo(),
+                p.getIdEmpleadoAsignado(),
+                p.getNombreEmpleadoAsignado(),
+                p.getRolEmpleadoAsignado(),
+                p.getIdFamiliarAsignado(),
+                p.getNombreFamiliarAsignado(),
+                p.getEmailFamiliarAsignado(),
+                p.getParentescoFamiliar()
+        );
+    }
+
     @GetMapping
-    public ResponseEntity<java.util.List<PacienteResponseDTO>> obtenerTodos() {
-        java.util.List<PacienteResponseDTO> lista = pacienteService.obtenerTodos().stream()
-                .map(p -> new PacienteResponseDTO(
-                        p.getIdPaciente(),
-                        p.getNombreCompleto(),
-                        p.getFechaNacimiento(),
-                        p.getDiagnosticoFase(),
-                        p.getActivo()
-                ))
-                .collect(java.util.stream.Collectors.toList());
+    public ResponseEntity<List<PacienteResponseDTO>> obtenerTodos() {
+        List<PacienteResponseDTO> lista = pacienteService.obtenerTodos().stream()
+                .map(this::mapearResponse)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(lista);
     }
+
     @GetMapping("/{id}/historial")
     public ResponseEntity<HistorialDTO> obtenerHistorial(@PathVariable Long id) {
-
         HistorialDTO historial = pacienteService.obtenerHistorial(id);
-
         return ResponseEntity.ok(historial);
     }
+
     @PostMapping
     public ResponseEntity<PacienteResponseDTO> crearPaciente(@RequestBody PacienteRequestDTO requestDTO) {
-        // Mapeo manual RequestDTO -> Entity
         PacienteEntity entity = new PacienteEntity();
-        entity.setNombreCompleto(requestDTO.getNombreCompleto() != null && !requestDTO.getNombreCompleto().isBlank() ? requestDTO.getNombreCompleto().trim() : "Paciente Lumina");
-        entity.setFechaNacimiento(requestDTO.getFechaNacimiento() != null ? requestDTO.getFechaNacimiento() : java.time.LocalDate.of(1960, 1, 1));
-        entity.setDiagnosticoFase(requestDTO.getDiagnosticoFase() != null && !requestDTO.getDiagnosticoFase().isBlank() ? requestDTO.getDiagnosticoFase().trim() : "Control clínico general");
+        entity.setNombreCompleto(requestDTO.getNombreCompleto() != null && !requestDTO.getNombreCompleto().isBlank()
+                ? requestDTO.getNombreCompleto().trim() : "Paciente Lumina");
+        entity.setFechaNacimiento(requestDTO.getFechaNacimiento() != null
+                ? requestDTO.getFechaNacimiento() : java.time.LocalDate.of(1960, 1, 1));
+        entity.setDiagnosticoFase(requestDTO.getDiagnosticoFase() != null && !requestDTO.getDiagnosticoFase().isBlank()
+                ? requestDTO.getDiagnosticoFase().trim() : "Control clínico general");
         entity.setActivo(true);
-        
+
+        // Asignación de profesional / médico o empleado
+        entity.setIdEmpleadoAsignado(requestDTO.getIdEmpleadoAsignado());
+        entity.setNombreEmpleadoAsignado(requestDTO.getNombreEmpleadoAsignado());
+        entity.setRolEmpleadoAsignado(requestDTO.getRolEmpleadoAsignado());
+
+        // Asignación de familiar
+        entity.setIdFamiliarAsignado(requestDTO.getIdFamiliarAsignado());
+        entity.setNombreFamiliarAsignado(requestDTO.getNombreFamiliarAsignado());
+        entity.setEmailFamiliarAsignado(requestDTO.getEmailFamiliarAsignado());
+        entity.setParentescoFamiliar(requestDTO.getParentescoFamiliar());
+
         PacienteEntity pacienteGuardado = pacienteService.registrarPaciente(entity);
-        
-        // Mapeo manual Entity -> ResponseDTO
-        PacienteResponseDTO responseDTO = new PacienteResponseDTO(
-                pacienteGuardado.getIdPaciente(),
-                pacienteGuardado.getNombreCompleto(),
-                pacienteGuardado.getFechaNacimiento(),
-                pacienteGuardado.getDiagnosticoFase(),
-                pacienteGuardado.getActivo()
-        );
-        
-        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
+        return new ResponseEntity<>(mapearResponse(pacienteGuardado), HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PacienteResponseDTO> obtenerPaciente(@PathVariable Long id) {
         Optional<PacienteEntity> pacienteOpt = pacienteService.obtenerPacientePorId(id);
-        
-        if (pacienteOpt.isPresent()) {
-            PacienteEntity entity = pacienteOpt.get();
-            // Mapeo manual Entity -> ResponseDTO
-            PacienteResponseDTO responseDTO = new PacienteResponseDTO(
-                    entity.getIdPaciente(),
-                    entity.getNombreCompleto(),
-                    entity.getFechaNacimiento(),
-                    entity.getDiagnosticoFase(),
-                    entity.getActivo()
-            );
-            return ResponseEntity.ok(responseDTO);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        return pacienteOpt.map(pacienteEntity -> ResponseEntity.ok(mapearResponse(pacienteEntity)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}")
@@ -99,17 +102,62 @@ public class PacienteController {
             if (requestDTO.getDiagnosticoFase() != null) {
                 entity.setDiagnosticoFase(requestDTO.getDiagnosticoFase().trim());
             }
+
+            if (requestDTO.getIdEmpleadoAsignado() != null) {
+                entity.setIdEmpleadoAsignado(requestDTO.getIdEmpleadoAsignado());
+            }
+            if (requestDTO.getNombreEmpleadoAsignado() != null) {
+                entity.setNombreEmpleadoAsignado(requestDTO.getNombreEmpleadoAsignado().trim());
+            }
+            if (requestDTO.getRolEmpleadoAsignado() != null) {
+                entity.setRolEmpleadoAsignado(requestDTO.getRolEmpleadoAsignado().trim());
+            }
+
+            if (requestDTO.getIdFamiliarAsignado() != null) {
+                entity.setIdFamiliarAsignado(requestDTO.getIdFamiliarAsignado());
+            }
+            if (requestDTO.getNombreFamiliarAsignado() != null) {
+                entity.setNombreFamiliarAsignado(requestDTO.getNombreFamiliarAsignado().trim());
+            }
+            if (requestDTO.getEmailFamiliarAsignado() != null) {
+                entity.setEmailFamiliarAsignado(requestDTO.getEmailFamiliarAsignado().trim());
+            }
+            if (requestDTO.getParentescoFamiliar() != null) {
+                entity.setParentescoFamiliar(requestDTO.getParentescoFamiliar().trim());
+            }
+
             PacienteEntity actualizado = pacienteService.registrarPaciente(entity);
-            return ResponseEntity.ok(new PacienteResponseDTO(
-                    actualizado.getIdPaciente(),
-                    actualizado.getNombreCompleto(),
-                    actualizado.getFechaNacimiento(),
-                    actualizado.getDiagnosticoFase(),
-                    actualizado.getActivo()
-            ));
+            return ResponseEntity.ok(mapearResponse(actualizado));
         } else {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    @PutMapping("/{id}/asignar-familiar")
+    public ResponseEntity<PacienteResponseDTO> asignarFamiliar(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        Optional<PacienteEntity> pacienteOpt = pacienteService.obtenerPacientePorId(id);
+        if (pacienteOpt.isPresent()) {
+            PacienteEntity entity = pacienteOpt.get();
+            if (body.containsKey("nombreFamiliar")) {
+                entity.setNombreFamiliarAsignado(body.get("nombreFamiliar"));
+            }
+            if (body.containsKey("emailFamiliar")) {
+                entity.setEmailFamiliarAsignado(body.get("emailFamiliar"));
+            }
+            if (body.containsKey("parentesco")) {
+                entity.setParentescoFamiliar(body.get("parentesco"));
+            }
+            if (body.containsKey("idFamiliar") && body.get("idFamiliar") != null) {
+                try {
+                    entity.setIdFamiliarAsignado(Long.parseLong(body.get("idFamiliar")));
+                } catch (Exception ignored) {}
+            }
+            PacienteEntity actualizado = pacienteService.registrarPaciente(entity);
+            return ResponseEntity.ok(mapearResponse(actualizado));
+        }
+        return ResponseEntity.notFound().build();
     }
 
     @DeleteMapping("/{id}")
